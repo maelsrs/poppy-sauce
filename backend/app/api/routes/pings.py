@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.models import PingDocument
+from app.models.ping import PingDocument
 
 router = APIRouter(prefix="/pings", tags=["pings"])
 
