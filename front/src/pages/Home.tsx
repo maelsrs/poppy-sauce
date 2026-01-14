@@ -44,7 +44,7 @@ function HomePage() {
           <StatRow label="Âge du compte" value="0" unit="j" />
           <StatRow label="Parties jouées" value="0" />
           <StatRow label="Temps de jeu" value="0mn 0s" />
-          <StatRow label="Succès" value="0" />
+          <StatRow label="Succès" value="A venir" />
           <div className="stats-card__footer">
             <span className="stat-row__label">Titre</span>
             <span className="stat-row__value">Membre</span>
