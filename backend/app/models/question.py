@@ -12,9 +12,14 @@ class QuestionType(str, Enum):
     MIXED = "mixed"
 
 
+class QuestionCategory(str, Enum):
+    DEFAULT = "default"
+
+
 class QuestionDocument(Document):
     question_id: int = Field(default=None, index=True, unique=True)
     question_type: QuestionType = Field(default=QuestionType.TEXT)
+    category: QuestionCategory = Field(default=QuestionCategory.DEFAULT)
     question: str = Field(...,)
     answers: List[str] = Field(default_factory=list,)
     image_url: Optional[HttpUrl] = Field(default=None)

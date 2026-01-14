@@ -68,7 +68,7 @@ const parseError = async (response: Response): Promise<Error> => {
   }
 };
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const method = options.method ?? 'GET';
   const url = buildUrl(path);
 

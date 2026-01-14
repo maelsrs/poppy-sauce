@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
 import { Field } from '../components/ui';
 
 // --- Types ---
@@ -69,6 +71,10 @@ const clampInput = (value: string, min: number, max: number, fallback: number) =
 };
 
 function LobbyPage() {
+  const navigate = useNavigate();
+  const params = useParams();
+  const roomCode = (params.code ?? '').toUpperCase();
+  const { user, loading: authLoading } = useAuth();
   const [configOpen, setConfigOpen] = useState(true);
   const [targetScore, setTargetScore] = useState(100);
   const [targetScoreDraft, setTargetScoreDraft] = useState('100');
@@ -80,6 +86,7 @@ function LobbyPage() {
   const [categoryInput, setCategoryInput] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -91,6 +98,53 @@ function LobbyPage() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!roomCode) return;
+    if (authLoading) return;
+
+    const guestKey = 'poppy.guest.uuid';
+    const guestPseudoKey = 'poppy.guest.pseudo';
+
+    const playerUuid = user?.uuid ?? (localStorage.getItem(guestKey) || crypto.randomUUID());
+    const pseudo = user?.username ?? (localStorage.getItem(guestPseudoKey) || 'Invité');
+
+    if (!user) {
+      localStorage.setItem(guestKey, playerUuid);
+      localStorage.setItem(guestPseudoKey, pseudo);
+    }
+
+    const apiBase = import.meta.env.VITE_API_URL ?? 'http://localhost:8081';
+    const wsBase = apiBase.startsWith('https://') ? apiBase.replace(/^https:/, 'wss:') : apiBase.replace(/^http:/, 'ws:');
+    const wsUrl = `${wsBase}/ws/rooms/${encodeURIComponent(roomCode)}?player_uuid=${encodeURIComponent(
+      playerUuid,
+    )}&pseudo=${encodeURIComponent(pseudo)}`;
+
+    const socket = new WebSocket(wsUrl);
+    socketRef.current = socket;
+
+    socket.addEventListener('close', (event) => {
+      if (event.code === 4404) {
+        navigate('/public-games');
+      }
+    });
+
+    const ping = window.setInterval(() => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send('ping');
+      }
+    }, 8081);
+
+    return () => {
+      window.clearInterval(ping);
+      try {
+        socket.close();
+      } catch {
+        // ignore
+      }
+      socketRef.current = null;
+    };
+  }, [authLoading, navigate, roomCode, user]);
 
   const toggleMode = (id: string) => {
     setCategories((prev) =>
@@ -284,7 +338,7 @@ function LobbyPage() {
         <div className="stage-content">
           <div className="placeholder-box">
             <span className="status-dot pulsing" />
-            <h2>En attente de lancement</h2>
+            <h2>{roomCode ? `Room ${roomCode}` : 'En attente de lancement'}</h2>
             <p>L'hôte configure la partie...</p>
           </div>
         </div>

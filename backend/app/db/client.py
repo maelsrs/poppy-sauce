@@ -4,11 +4,12 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 from app.core.config import MONGODB_URI, MONGODB_DB
 from app.models.question import QuestionDocument
+from app.models.room import RoomDocument
 from app.models.user import UserDocument
 
 logger = logging.getLogger(__name__)
 client: Optional[AsyncIOMotorClient] = None
-DOCUMENT_MODELS = [QuestionDocument, UserDocument]
+DOCUMENT_MODELS = [QuestionDocument, UserDocument, RoomDocument]
 
 async def init_db() -> None:
     global client

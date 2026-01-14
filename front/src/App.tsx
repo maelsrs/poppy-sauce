@@ -32,6 +32,7 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/lobby" element={<LobbyPage />} />
+          <Route path="/game/:code" element={<LobbyPage />} />
           <Route path="/public-games" element={<PublicGamesPage />} />
           <Route path="*" element={<div className="not-found">Page introuvable</div>} />
         </Routes>

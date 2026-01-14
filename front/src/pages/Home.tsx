@@ -3,6 +3,7 @@ import { FileText, Gamepad2, Lollipop, User } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { ActionCard, Field, Modal, StatRow } from '../components/ui';
+import { createRoom } from '../services/rooms';
 
 const formatPlaytime = (seconds: number) => {
   const minutes = Math.floor(seconds / 60);
@@ -20,7 +21,9 @@ function HomePage() {
   const [showCreate, setShowCreate] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
   const [roomName, setRoomName] = useState('Salon de X');
+  const [privacy, setPrivacy] = useState<'OPEN' | 'PRIVATE'>('PRIVATE');
   const [joinCode, setJoinCode] = useState('');
+  const [creating, setCreating] = useState(false);
 
   const guard = (action: () => void) => {
     if (authLoading) {
@@ -41,6 +44,33 @@ function HomePage() {
     navigate(`/game/${code}`);
     setShowJoin(false);
     setJoinCode('');
+  };
+
+  const handleCreate = async () => {
+    if (authLoading) {
+      return;
+    }
+    if (!user) {
+      navigate('/auth?mode=login');
+      return;
+    }
+    if (!roomName.trim()) {
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const created = await createRoom({
+        room_name: roomName.trim(),
+        player_uuid: user.uuid,
+        pseudo: user.username,
+        privacy,
+      });
+      setShowCreate(false);
+      navigate(`/game/${created.room_code}`);
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
@@ -83,7 +113,7 @@ function HomePage() {
         <div className="stats-card">
           <StatRow label="Niveau" value={user?.level ?? 0} />
           <StatRow label="Temps de jeu" value={user ? formatPlaytime(user.playtime) : '0m'} />
-          <StatRow label="Titre" value={user?.rank ?? 'Invité'} />
+          <StatRow label="Rank" value={user?.rank ?? 'Invité'} />
           <StatRow label="Dernière connexion" value={user?.last_login ? user.last_login.slice(0, 10) : '-'} />
           <div className="stats-card__footer">
             <span className="stat-row__label">Profil</span>
@@ -107,7 +137,15 @@ function HomePage() {
             tone="purple"
             icon={Lollipop}
             subIcon={<span>🍭</span>}
-            onClick={() => guard(() => setShowCreate(true))}
+            onClick={() =>
+              guard(() => {
+                const currentUser = user;
+                if (!currentUser) return;
+                setRoomName(`Salon de ${currentUser.username}`);
+                setPrivacy('PRIVATE');
+                setShowCreate(true);
+              })
+            }
           />
 
           <ActionCard title="Stats" tone="slate" icon={Gamepad2} subIcon={<span>🎮</span>} />
@@ -124,12 +162,45 @@ function HomePage() {
 
       {showCreate ? (
         <Modal title="Créer un salon" onClose={() => setShowCreate(false)}>
-          <Field label="Nom du salon" value={roomName} onChange={setRoomName} placeholder="Salon de X" />
+          <Field
+            label="Nom du salon"
+            value={roomName}
+            onChange={setRoomName}
+            placeholder="Salon de X"
+          />
+          <div className="field">
+            <span className="field__label">Visibilité</span>
+            <div className="account-tabs">
+              <button
+                type="button"
+                className={`account-tab ${privacy === 'OPEN' ? 'is-active' : ''}`}
+                onClick={() => setPrivacy('OPEN')}
+              >
+                Publique
+              </button>
+              <button
+                type="button"
+                className={`account-tab ${privacy === 'PRIVATE' ? 'is-active' : ''}`}
+                onClick={() => setPrivacy('PRIVATE')}
+              >
+                Privée
+              </button>
+            </div>
+          </div>
           <div className="modal__actions">
-            <button type="button" className="account-card__btn account-card__btn--ghost" onClick={() => setShowCreate(false)}>
+            <button
+              type="button"
+              className="account-card__btn account-card__btn--ghost"
+              onClick={() => setShowCreate(false)}
+            >
               Annuler
             </button>
-            <button type="button" className="account-card__btn account-card__btn--primary" onClick={() => setShowCreate(false)}>
+            <button
+              type="button"
+              className="account-card__btn account-card__btn--primary"
+              onClick={handleCreate}
+              disabled={creating}
+            >
               Créer
             </button>
           </div>
