@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { Field, Modal } from '../components/ui';
 
 type PublicGame = {
@@ -13,10 +14,10 @@ type PublicGame = {
 };
 
 const publicGames: PublicGame[] = [
-  { id: 'a', name: 'Partie de Alex', players: '3 / 8', code: 'QWERT', host: 'Alex', target: 100 },
-  { id: 'b', name: 'Partie de Sam', players: '5 / 8', code: 'NMPOL', host: 'Sam', target: 150 },
-  { id: 'c', name: 'Partie de Lise', players: '2 / 8', code: 'HJKLR', host: 'Lise', target: 120 },
-  { id: 'd', name: 'Partie de Rayan', players: '7 / 8', code: 'ZXCVB', host: 'Rayan', target: 200 },
+  { id: 'a', name: 'Alex', players: '3 / 8', code: 'QWERT', host: 'Alex', target: 100 },
+  { id: 'b', name: 'Sam', players: '5 / 8', code: 'NMPOL', host: 'Sam', target: 150 },
+  { id: 'c', name: 'Lise', players: '2 / 8', code: 'HJKLR', host: 'Lise', target: 120 },
+  { id: 'd', name: 'Rayan', players: '7 / 8', code: 'ZXCVB', host: 'Rayan', target: 200 },
 ];
 
 function PublicGamesPage() {
@@ -37,9 +38,9 @@ function PublicGamesPage() {
 
       <div className="public__grid">
         {publicGames.map((game) => (
-          <article key={game.id} className="game-card">
+          <Link key={game.id} to={`/game/${game.code}`} className="game-card" aria-label={`Rejoindre ${game.name}`}>
             <header className="game-card__top">
-              <h2 className="game-card__title">{game.name}</h2>
+              <h2 className="game-card__title">Salon: {game.name}</h2>
               <span className="game-card__players">{game.players} joueurs</span>
             </header>
             <div className="game-card__code">CODE · {game.code}</div>
@@ -47,7 +48,7 @@ function PublicGamesPage() {
               <span className="game-card__host">Hôte : {game.host}</span>
               <span className="game-card__target">🎯 {game.target}</span>
             </div>
-          </article>
+          </Link>
         ))}
       </div>
 

@@ -6,7 +6,19 @@ import { ActionCard, Field, Modal, StatRow } from '../components/ui';
 function HomePage() {
   const navigate = useNavigate();
   const [showCreate, setShowCreate] = useState(false);
+  const [showJoin, setShowJoin] = useState(false);
   const [roomName, setRoomName] = useState('Salon de X');
+  const [joinCode, setJoinCode] = useState('');
+
+  const handleJoin = () => {
+    const code = joinCode.trim().toUpperCase();
+    if (!code) {
+      return;
+    }
+    navigate(`/game/${code}`);
+    setShowJoin(false);
+    setJoinCode('');
+  };
 
   return (
     <div className="layout">
@@ -60,7 +72,7 @@ function HomePage() {
 
           <ActionCard title="Stats" tone="slate" icon={Gamepad2} subIcon={<span>🎮</span>} />
 
-          <ActionCard title="Rejoindre une partie" tone="teal" icon={User} subIcon={<span>👤</span>} />
+          <ActionCard title="Rejoindre une partie" tone="teal" icon={User} subIcon={<span>👤</span>} onClick={() => setShowJoin(true)} />
         </div>
       </section>
 
@@ -73,6 +85,20 @@ function HomePage() {
             </button>
             <button type="button" className="account-card__btn account-card__btn--primary" onClick={() => setShowCreate(false)}>
               Créer
+            </button>
+          </div>
+        </Modal>
+      ) : null}
+
+      {showJoin ? (
+        <Modal title="Rejoindre une partie" onClose={() => setShowJoin(false)}>
+          <Field label="Code de la partie" value={joinCode} onChange={setJoinCode} placeholder="ABCDE" />
+          <div className="modal__actions">
+            <button type="button" className="account-card__btn account-card__btn--ghost" onClick={() => setShowJoin(false)}>
+              Annuler
+            </button>
+            <button type="button" className="account-card__btn account-card__btn--primary" onClick={handleJoin}>
+              Rejoindre
             </button>
           </div>
         </Modal>
