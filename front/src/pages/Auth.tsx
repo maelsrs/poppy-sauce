@@ -1,28 +1,72 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
 import { Field } from '../components/ui';
 
 type AuthMode = 'login' | 'register';
 
 function AuthPage() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { login, register, loading, error, user, clearError } = useAuth();
+
   const initialMode = searchParams.get('mode') === 'register' ? 'register' : 'login';
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     const fromQuery = searchParams.get('mode') === 'register' ? 'register' : 'login';
     if (fromQuery !== mode) {
       setMode(fromQuery);
+      setFormError(null);
+      clearError();
     }
-  }, [mode, searchParams]);
+  }, [mode, searchParams, clearError]);
+
+  useEffect(() => {
+    if (!loading && user) {
+      navigate('/');
+    }
+  }, [user, loading, navigate]);
 
   const setModeAndQuery = (next: AuthMode) => {
     setMode(next);
     setSearchParams({ mode: next });
   };
+
+  const handleSubmit = async () => {
+    setFormError(null);
+    clearError();
+    if (mode === 'register' && password !== confirm) {
+      setFormError('Les mots de passe ne correspondent pas.');
+      return;
+    }
+
+    try {
+      if (mode === 'login') {
+        await login(email, password);
+      } else {
+        await register(email, username, password);
+      }
+      navigate('/');
+    } catch (err) {
+      if (err instanceof Error) {
+        setFormError(err.message);
+      } else {
+        setFormError("Une erreur s'est produite.");
+      }
+    }
+  };
+
+  const isSubmitDisabled =
+    loading ||
+    !email.trim() ||
+    !password.trim() ||
+    (mode === 'register' && (!username.trim() || !confirm.trim()));
 
   return (
     <section className="auth">
@@ -42,6 +86,7 @@ function AuthPage() {
             type="button"
             className={`account-tab ${mode === 'login' ? 'is-active' : ''}`}
             onClick={() => setModeAndQuery('login')}
+            disabled={loading}
           >
             Login
           </button>
@@ -49,23 +94,40 @@ function AuthPage() {
             type="button"
             className={`account-tab ${mode === 'register' ? 'is-active' : ''}`}
             onClick={() => setModeAndQuery('register')}
+            disabled={loading}
           >
             Register
           </button>
         </div>
 
-        <div className="auth__form">
+        <form
+          className="auth__form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSubmit();
+          }}
+        >
           <Field label="Email" type="email" value={email} onChange={setEmail} placeholder="poppy@email.com" />
+          {mode === 'register' ? (
+            <Field label="Pseudo" value={username} onChange={setUsername} placeholder="PoppyPlayer" />
+          ) : null}
           <Field label="Mot de passe" type="password" value={password} onChange={setPassword} placeholder="••••••••" />
           {mode === 'register' ? (
             <Field label="Confirmer" type="password" value={confirm} onChange={setConfirm} placeholder="••••••••" />
           ) : null}
+
+          {(formError || error) && <div className="auth__error">{formError ?? error}</div>}
+
           <div className="account-panel__actions">
-            <button type="button" className="account-card__btn account-card__btn--primary">
-              {mode === 'login' ? 'Se connecter' : "S'inscrire"}
+            <button
+              type="submit"
+              className="account-card__btn account-card__btn--primary"
+              disabled={isSubmitDisabled}
+            >
+              {loading ? 'Patiente...' : mode === 'login' ? 'Se connecter' : "S'inscrire"}
             </button>
           </div>
-        </div>
+        </form>
       </div>
     </section>
   );

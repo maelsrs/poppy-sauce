@@ -392,6 +392,15 @@
   gap: 12px;
 }
 
+.auth__error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fecdd3;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
 .account-card__btn {
   padding: 12px;
   border-radius: 12px;

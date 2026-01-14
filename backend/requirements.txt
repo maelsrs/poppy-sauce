@@ -4,3 +4,7 @@ pymongo
 motor
 beanie
 python-dotenv
+bcrypt
+python-jose[cryptography]
+email-validator
+pydantic>=1.10,<2

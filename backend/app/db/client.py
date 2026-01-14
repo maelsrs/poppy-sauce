@@ -3,14 +3,17 @@ import logging
 from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 from app.core.config import MONGODB_URI, MONGODB_DB
-from app.models.ping import PingDocument
+from app.models.question import QuestionDocument
+from app.models.user import UserDocument
 
 logger = logging.getLogger(__name__)
 client: Optional[AsyncIOMotorClient] = None
-DOCUMENT_MODELS = [PingDocument]
+DOCUMENT_MODELS = [QuestionDocument, UserDocument]
 
 async def init_db() -> None:
     global client
+    if client:
+        return
     try:
         client = AsyncIOMotorClient(MONGODB_URI)
         await init_beanie(database=client[MONGODB_DB], document_models=DOCUMENT_MODELS)
@@ -31,3 +34,8 @@ async def close_db() -> None:
         logger.error("Failed to close MongoDB client", exc_info=exc)
     finally:
         client = None
+
+
+async def ensure_db() -> None:
+    if client is None:
+        await init_db()
