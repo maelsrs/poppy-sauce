@@ -3,3 +3,18 @@ __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+
+# Env
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# Node
+node_modules/
+dist/
+
+# OS
+.DS_Store
+Thumbs.db

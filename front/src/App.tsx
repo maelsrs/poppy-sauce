@@ -7,7 +7,7 @@ import LobbyPage from './pages/Lobby';
 
 function App() {
   const location = useLocation();
-  const isLobby = location.pathname.startsWith('/lobby');
+  const isLobby = location.pathname.startsWith('/lobby') || location.pathname.startsWith('/game/');
 
   return (
     <div className="app">

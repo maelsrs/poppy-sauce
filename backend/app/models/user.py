@@ -39,7 +39,6 @@ class UserCreate(BaseModel):
 class UserPublic(BaseModel):
     uuid: str
     username: str
-    email: EmailStr
     rank: UserRank
     last_login: Optional[datetime] = None
     first_login: Optional[datetime] = None

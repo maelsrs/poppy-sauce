@@ -1,7 +1,4 @@
-import asyncio
 import logging
-import os
-from time import time
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -13,7 +10,8 @@ from app.api.routes.health import router as health_router
 from app.api.routes.rooms import router as rooms_router
 from app.api.routes.users import router as users_router
 from app.api.websockets import ws_router
-from app.db.client import init_db, close_db, ensure_db
+from app.core.config import CORS_ORIGINS
+from app.db.client import init_db, close_db
 
 app = FastAPI(title="poppy-sauce")
 
@@ -64,7 +62,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

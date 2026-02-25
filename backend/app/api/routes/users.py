@@ -17,6 +17,15 @@ async def list_users() -> List[UserPublic]:
     return await UserDocument.find_all().to_list()
 
 
+@router.get("/{uuid}", response_model=UserPublic)
+async def get_user(uuid: str) -> UserPublic:
+    await ensure_db()
+    user = await UserDocument.find_one({"uuid": uuid})
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé.")
+    return user.to_public()
+
+
 @router.post("", response_model=UserPublic, status_code=status.HTTP_201_CREATED)
 async def create_user(payload: UserCreate) -> UserPublic:
     await ensure_db()
