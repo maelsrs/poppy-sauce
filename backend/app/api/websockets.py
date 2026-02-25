@@ -30,6 +30,7 @@ class ConnectionManager:
         self.room_timers: Dict[str, asyncio.Task] = {}
         self.room_transition_tasks: Dict[str, asyncio.Task] = {}
         self.playing_since: Dict[str, Dict[str, int]] = {}
+        self.chat_timestamps: Dict[str, list[float]] = {}
 
     def connect(self, room_code: str, player_uuid: str, ws: WebSocket):
         if room_code not in self.rooms:
@@ -659,16 +660,25 @@ async def room_websocket_endpoint(
 
             elif msg_type == "chat_message":
                 text = str(msg.get("text", "")).strip()
-                if text and len(text) <= 300:
-                    room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
-                    player = room.find_player(player_uuid) if room else None
-                    await manager.broadcast(room_code, {
-                        "type": "chat_message",
-                        "player_uuid": player_uuid,
-                        "pseudo": player.pseudo if player else None,
-                        "text": text,
-                        "timestamp": _now_ms(),
-                    })
+                if not text or len(text) > 300:
+                    continue
+                now_t = asyncio.get_event_loop().time()
+                ts_list = manager.chat_timestamps.get(player_uuid, [])
+                ts_list = [t for t in ts_list if now_t - t < 1.0]
+                if len(ts_list) >= 3:
+                    continue
+                ts_list.append(now_t)
+                manager.chat_timestamps[player_uuid] = ts_list
+
+                room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
+                player = room.find_player(player_uuid) if room else None
+                await manager.broadcast(room_code, {
+                    "type": "chat_message",
+                    "player_uuid": player_uuid,
+                    "pseudo": player.pseudo if player else None,
+                    "text": text,
+                    "timestamp": _now_ms(),
+                })
 
             elif msg_type == "update_config":
                 room = await RoomDocument.find_one(RoomDocument.room_code == room_code)

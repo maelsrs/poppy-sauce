@@ -151,6 +151,9 @@ function LobbyPage() {
   const [chatInput, setChatInput] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  const [guestPseudo, setGuestPseudo] = useState<string | null>(null);
+  const [pseudoDraft, setPseudoDraft] = useState('');
+
   const timerRef = useRef<number | null>(null);
   const answerInputRef = useRef<HTMLInputElement>(null);
 
@@ -212,18 +215,26 @@ function LobbyPage() {
   }, [currentQuestion, hasAnsweredCorrectly, timeUp]);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user && !localStorage.getItem('poppy.guest.pseudo')) {
+      setGuestPseudo(null);
+      return;
+    }
+    setGuestPseudo(user?.username ?? localStorage.getItem('poppy.guest.pseudo'));
+  }, [authLoading, user]);
+
+  useEffect(() => {
     if (!roomCode) return;
     if (authLoading) return;
+    if (!user && guestPseudo === null) return;
 
     const guestKey = 'poppy.guest.uuid';
-    const guestPseudoKey = 'poppy.guest.pseudo';
 
     const uuid = user?.uuid ?? (localStorage.getItem(guestKey) || crypto.randomUUID());
-    const pseudo = user?.username ?? (localStorage.getItem(guestPseudoKey) || 'Invité');
+    const pseudo = user?.username ?? guestPseudo ?? 'Invité';
 
     if (!user) {
       localStorage.setItem(guestKey, uuid);
-      localStorage.setItem(guestPseudoKey, pseudo);
     }
 
     setPlayerUuid(uuid);
@@ -452,7 +463,7 @@ function LobbyPage() {
       socketRef.current = null;
       setWsReady(false);
     };
-  }, [authLoading, navigate, roomCode, user]);
+  }, [authLoading, guestPseudo, navigate, roomCode, user]);
 
   const toggleMode = (id: string) => {
     setCategories((prev) =>
@@ -768,6 +779,46 @@ function LobbyPage() {
       </div>
     </div>
   );
+
+  const handlePseudoConfirm = () => {
+    const name = pseudoDraft.trim();
+    if (!name || name.length < 2) return;
+    localStorage.setItem('poppy.guest.pseudo', name);
+    setGuestPseudo(name);
+  };
+
+  if (!user && guestPseudo === null && !authLoading) {
+    return (
+      <div className="lobby-shell is-config-closed">
+        <main className="lobby-stage">
+          <div className="stage-content">
+            <div className="pseudo-popup">
+              <h2>Choisis ton pseudo</h2>
+              <p>Comment veux-tu apparaître dans la partie ?</p>
+              <input
+                type="text"
+                className="pseudo-popup__input"
+                value={pseudoDraft}
+                onChange={(e) => setPseudoDraft(e.target.value.slice(0, 20))}
+                onKeyDown={(e) => e.key === 'Enter' && handlePseudoConfirm()}
+                placeholder="Pseudo..."
+                maxLength={20}
+                autoFocus
+              />
+              <button
+                type="button"
+                className="btn-join"
+                onClick={handlePseudoConfirm}
+                disabled={pseudoDraft.trim().length < 2}
+              >
+                REJOINDRE
+              </button>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   if (!wsReady) {
     return (
