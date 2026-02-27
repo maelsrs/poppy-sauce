@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 RUN npm install -g pnpm && pnpm install
 COPY . .
-ARG VITE_API_URL=http://localhost:8081
+ARG VITE_API_URL=82.67.196.38:8081
 ENV VITE_API_URL=$VITE_API_URL
 RUN pnpm run build
 
