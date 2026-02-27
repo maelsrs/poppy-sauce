@@ -239,7 +239,7 @@ function LobbyPage() {
 
     setPlayerUuid(uuid);
 
-    const apiBase = import.meta.env.VITE_API_URL ?? 'http://82.67.196.38:8081';
+    const apiBase = import.meta.env.VITE_API_URL ?? 'http://localhost:8081';
     const wsBase = apiBase.startsWith('https://') ? apiBase.replace(/^https:/, 'wss:') : apiBase.replace(/^http:/, 'ws:');
     const wsUrl = `${wsBase}/ws/rooms/${encodeURIComponent(roomCode)}?player_uuid=${encodeURIComponent(
       uuid,
