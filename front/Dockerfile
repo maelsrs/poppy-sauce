@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 RUN npm install -g pnpm && pnpm install
 COPY . .
-ARG VITE_API_URL=192.168.10.10:8081
+ARG VITE_API_URL=https://api-poppy.lsblk2exa.beauty/
 ENV VITE_API_URL=$VITE_API_URL
 RUN pnpm run build
 
