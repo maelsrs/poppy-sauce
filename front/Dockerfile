@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 RUN npm install -g pnpm && pnpm install
 COPY . .
-ARG VITE_API_URL=http://localhost:8081
+ARG VITE_API_URL=https://api-poppy.lsblk2exa.beauty/
 ENV VITE_API_URL=$VITE_API_URL
 RUN pnpm run build
 
@@ -12,5 +12,5 @@ RUN pnpm run build
 FROM nginx:alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 80
+EXPOSE 443
 CMD ["nginx", "-g", "daemon off;"]

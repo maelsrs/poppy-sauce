@@ -19,7 +19,6 @@ const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8081';
 const TOKEN_KEY = 'poppy.auth.token';
 
 const buildUrl = (path: string) => `${API_BASE}${path}`;
-
 const translateDetail = (text: string): string => {
   const lower = text.toLowerCase();
 
