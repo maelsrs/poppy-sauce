@@ -35,7 +35,7 @@ class QuestionCategory(str, Enum):
 class QuestionDocument(Document):
     question_id: int = Field(default=None, index=True, unique=True)
     question_type: QuestionType = Field(default=QuestionType.TEXT)
-    category: QuestionCategory = Field(default=QuestionCategory.DEFAULT)
+    category: QuestionCategory = Field(default=QuestionCategory.DEFAULT, index=True)
     question: str = Field(...,)
     answers: List[str] = Field(default_factory=list,)
     image_url: Optional[HttpUrl] = Field(default=None)
