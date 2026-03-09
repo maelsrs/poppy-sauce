@@ -1,5 +1,6 @@
 import logging
 
+import socketio as socketio_lib
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,24 +10,24 @@ from app.api.routes.auth import router as auth_router
 from app.api.routes.health import router as health_router
 from app.api.routes.rooms import router as rooms_router
 from app.api.routes.users import router as users_router
-from app.api.websockets import ws_router
+from app.api.websockets import sio
 from app.core.config import CORS_ORIGINS
 from app.db.client import init_db, close_db
 
-app = FastAPI(title="poppy-sauce")
+fastapi_app = FastAPI(title="poppy-sauce")
 
 logger = logging.getLogger("uvicorn.access")
 
-@app.on_event("startup")
+@fastapi_app.on_event("startup")
 async def startup_event():
     await init_db()
 
 
-@app.on_event("shutdown")
+@fastapi_app.on_event("shutdown")
 async def shutdown_event():
     await close_db()
 
-@app.exception_handler(RequestValidationError)
+@fastapi_app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     detail = exc.errors()
     message = "Données invalides."
@@ -60,7 +61,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
     return JSONResponse(status_code=422, content={"detail": message})
 
-app.add_middleware(
+fastapi_app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
     allow_credentials=False,
@@ -68,8 +69,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(health_router)
-app.include_router(auth_router)
-app.include_router(rooms_router)
-app.include_router(users_router)
-app.include_router(ws_router)
+fastapi_app.include_router(health_router)
+fastapi_app.include_router(auth_router)
+fastapi_app.include_router(rooms_router)
+fastapi_app.include_router(users_router)
+
+app = socketio_lib.ASGIApp(sio, other_app=fastapi_app)
