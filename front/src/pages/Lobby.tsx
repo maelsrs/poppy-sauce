@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { io, Socket } from 'socket.io-client';
 import { useAuth } from '../auth/AuthContext';
 import { Field } from '../components/ui';
 import { request } from '../services/auth';
@@ -120,7 +121,7 @@ function LobbyPage() {
   const [categoryInput, setCategoryInput] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const socketRef = useRef<WebSocket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
 
   const [players, setPlayers] = useState<Player[]>([]);
   const [playerUuid, setPlayerUuid] = useState<string>('');
@@ -162,10 +163,10 @@ function LobbyPage() {
     [players, playerUuid],
   );
 
-  const sendWsMessage = useCallback((msg: object) => {
+  const sendWsMessage = useCallback((event: string, data?: object) => {
     const socket = socketRef.current;
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify(msg));
+    if (socket && socket.connected) {
+      socket.emit(event, data);
     }
   }, []);
 
@@ -240,226 +241,210 @@ function LobbyPage() {
     setPlayerUuid(uuid);
 
     const apiBase = import.meta.env.VITE_API_URL ?? 'http://localhost:8081';
-    const wsBase = apiBase.startsWith('https://') ? apiBase.replace(/^https:/, 'wss:') : apiBase.replace(/^http:/, 'ws:');
-    const wsUrl = `${wsBase}/ws/rooms/${encodeURIComponent(roomCode)}?player_uuid=${encodeURIComponent(
-      uuid,
-    )}&pseudo=${encodeURIComponent(pseudo)}`;
 
-    const socket = new WebSocket(wsUrl);
+    const socket = io(apiBase, {
+      path: '/socket.io/',
+      query: { room_code: roomCode, player_uuid: uuid, pseudo },
+      transports: ['websocket'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 10,
+    });
     socketRef.current = socket;
 
-    socket.addEventListener('message', (event) => {
-      try {
-        const msg = JSON.parse(event.data);
-        switch (msg.type) {
-          case 'room_state':
-            setPlayers(msg.players ?? []);
-            setWsReady(true);
-            if (msg.game_state === 'PLAYING') setGameState('PLAYING');
-            else if (msg.game_state === 'FINISHED') setGameState('FINISHED');
-            else setGameState('WAITING');
-            if (msg.configurations) {
-              setTargetScore(msg.configurations.score_objective);
-              setTargetScoreDraft(String(msg.configurations.score_objective));
-              setDuration(msg.configurations.question_duration);
-              setDurationDraft(String(msg.configurations.question_duration));
-              setRounds(msg.configurations.rounds_to_win);
-              setRoundsDraft(String(msg.configurations.rounds_to_win));
-              if (msg.configurations.show_answers !== undefined) {
-                setShowAnswers(msg.configurations.show_answers);
-              }
-            }
-            if (msg.current_question) {
-              const cq = msg.current_question;
-              setCurrentQuestion({
-                question: cq.question,
-                question_type: cq.question_type,
-                image_url: cq.image_url,
-                time_limit: cq.time_limit,
-                round: cq.round,
-                question_index: cq.question_index,
-                total_questions: cq.total_questions,
-              });
-              setTimeLeft(cq.time_limit);
-              setCurrentRound(cq.round);
-              setHasAnsweredCorrectly(false);
-              setTimeUp(false);
-            setCorrectAnswer(null);
-              setMyAnswer('');
-              setLastWrongAnswer({});
-              if (msg.answered_players) {
-                const correctSet = new Set<string>();
-                for (const ap of msg.answered_players) {
-                  if (ap.is_correct) correctSet.add(ap.player_uuid);
-                }
-                setCorrectPlayerUuids(correctSet);
-                if (correctSet.has(uuid)) setHasAnsweredCorrectly(true);
-              }
-            }
-            if (msg.round_wins) setRoundWins(msg.round_wins);
-            break;
-
-          case 'game_started':
-            setGameState('PLAYING');
-            setConfigOpen(false);
-            setLeaderboard([]);
-            setWinner(null);
-            setRoundWins({});
-            setCurrentRound(1);
-            setCorrectPlayerUuids(new Set());
-            setLastWrongAnswer({});
-            setHasAnsweredCorrectly(false);
-            setTimeUp(false);
-            setCorrectAnswer(null);
-            setRoundWonInfo(null);
-            break;
-
-          case 'new_question':
-            setCurrentQuestion({
-              question: msg.question,
-              question_type: msg.question_type,
-              image_url: msg.image_url,
-              time_limit: msg.time_limit,
-              round: msg.round,
-              question_index: msg.question_index,
-              total_questions: msg.total_questions,
-            });
-            setTimeLeft(msg.time_limit);
-            setCurrentRound(msg.round);
-            setMyAnswer('');
-            setHasAnsweredCorrectly(false);
-            setTimeUp(false);
-            setCorrectAnswer(null);
-            setLastWrongAnswer({});
-            setCorrectPlayerUuids(new Set());
-            setRoundWonInfo(null);
-            break;
-
-          case 'player_answered':
-            if (msg.is_correct) {
-              setCorrectPlayerUuids((prev) => new Set(prev).add(msg.player_uuid));
-              if (msg.player_uuid === uuid) {
-                setHasAnsweredCorrectly(true);
-              }
-            }
-            setPlayers((prev) =>
-              prev.map((p) =>
-                p.player_uuid === msg.player_uuid ? { ...p, points: msg.total_points } : p,
-              ),
-            );
-            if (!msg.is_correct && msg.answer) {
-              setLastWrongAnswer((prev) => ({ ...prev, [msg.player_uuid]: msg.answer }));
-            }
-            break;
-
-          case 'all_answered':
-            setCorrectAnswer(msg.correct_answer ?? null);
-            break;
-
-          case 'time_up':
-            setTimeUp(true);
-            setTimeLeft(0);
-            setCorrectAnswer(msg.correct_answer ?? null);
-            break;
-
-          case 'round_won':
-            setRoundWins(msg.round_wins ?? {});
-            setRoundWonInfo({ pseudo: msg.pseudo, round: msg.round });
-            setPlayers((prev) => prev.map((p) => ({ ...p, points: 0 })));
-            break;
-
-          case 'game_finished':
-            setGameState('FINISHED');
-            setLeaderboard(msg.leaderboard ?? []);
-            setWinner(msg.winner ?? null);
-            break;
-
-          case 'game_reset':
-            setGameState('WAITING');
-            setCurrentQuestion(null);
-            setLeaderboard([]);
-            setWinner(null);
-            setRoundWins({});
-            setCurrentRound(1);
-            setCorrectPlayerUuids(new Set());
-            setLastWrongAnswer({});
-            setHasAnsweredCorrectly(false);
-            setTimeUp(false);
-            setCorrectAnswer(null);
-            setRoundWonInfo(null);
-            setPlayers((prev) => prev.map((p) => ({ ...p, points: 0 })));
-            break;
-
-          case 'player_join':
-            if (msg.player) {
-              setPlayers((prev) => {
-                const exists = prev.some((p) => p.player_uuid === msg.player.player_uuid);
-                if (exists) {
-                  return prev.map((p) =>
-                    p.player_uuid === msg.player.player_uuid ? { ...p, ...msg.player } : p,
-                  );
-                }
-                return [...prev, msg.player];
-              });
-            }
-            break;
-
-          case 'player_leave':
-            if (msg.player_uuid) {
-              setPlayers((prev) => prev.filter((p) => p.player_uuid !== msg.player_uuid));
-            }
-            break;
-
-          case 'config_update':
-            if (msg.configurations) {
-              setTargetScore(msg.configurations.score_objective);
-              setTargetScoreDraft(String(msg.configurations.score_objective));
-              setDuration(msg.configurations.question_duration);
-              setDurationDraft(String(msg.configurations.question_duration));
-              setRounds(msg.configurations.rounds_to_win);
-              setRoundsDraft(String(msg.configurations.rounds_to_win));
-              if (msg.configurations.show_answers !== undefined) {
-                setShowAnswers(msg.configurations.show_answers);
-              }
-            }
-            break;
-
-          case 'chat_message':
-            setChatMessages((prev) => [...prev.slice(-99), {
-              player_uuid: msg.player_uuid,
-              pseudo: msg.pseudo ?? 'Anonyme',
-              text: msg.text,
-              timestamp: msg.timestamp,
-            }]);
-            break;
-
-          case 'error':
-            alert(msg.message);
-            break;
+    socket.on('room_state', (msg) => {
+      setPlayers(msg.players ?? []);
+      setWsReady(true);
+      if (msg.game_state === 'PLAYING') setGameState('PLAYING');
+      else if (msg.game_state === 'FINISHED') setGameState('FINISHED');
+      else setGameState('WAITING');
+      if (msg.configurations) {
+        setTargetScore(msg.configurations.score_objective);
+        setTargetScoreDraft(String(msg.configurations.score_objective));
+        setDuration(msg.configurations.question_duration);
+        setDurationDraft(String(msg.configurations.question_duration));
+        setRounds(msg.configurations.rounds_to_win);
+        setRoundsDraft(String(msg.configurations.rounds_to_win));
+        if (msg.configurations.show_answers !== undefined) {
+          setShowAnswers(msg.configurations.show_answers);
         }
-      } catch {
+      }
+      if (msg.current_question) {
+        const cq = msg.current_question;
+        setCurrentQuestion({
+          question: cq.question,
+          question_type: cq.question_type,
+          image_url: cq.image_url,
+          time_limit: cq.time_limit,
+          round: cq.round,
+          question_index: cq.question_index,
+          total_questions: cq.total_questions,
+        });
+        setTimeLeft(cq.time_limit);
+        setCurrentRound(cq.round);
+        setHasAnsweredCorrectly(false);
+        setTimeUp(false);
+        setCorrectAnswer(null);
+        setMyAnswer('');
+        setLastWrongAnswer({});
+        if (msg.answered_players) {
+          const correctSet = new Set<string>();
+          for (const ap of msg.answered_players) {
+            if (ap.is_correct) correctSet.add(ap.player_uuid);
+          }
+          setCorrectPlayerUuids(correctSet);
+          if (correctSet.has(uuid)) setHasAnsweredCorrectly(true);
+        }
+      }
+      if (msg.round_wins) setRoundWins(msg.round_wins);
+    });
+
+    socket.on('game_started', () => {
+      setGameState('PLAYING');
+      setConfigOpen(false);
+      setLeaderboard([]);
+      setWinner(null);
+      setRoundWins({});
+      setCurrentRound(1);
+      setCorrectPlayerUuids(new Set());
+      setLastWrongAnswer({});
+      setHasAnsweredCorrectly(false);
+      setTimeUp(false);
+      setCorrectAnswer(null);
+      setRoundWonInfo(null);
+    });
+
+    socket.on('new_question', (msg) => {
+      setCurrentQuestion({
+        question: msg.question,
+        question_type: msg.question_type,
+        image_url: msg.image_url,
+        time_limit: msg.time_limit,
+        round: msg.round,
+        question_index: msg.question_index,
+        total_questions: msg.total_questions,
+      });
+      setTimeLeft(msg.time_limit);
+      setCurrentRound(msg.round);
+      setMyAnswer('');
+      setHasAnsweredCorrectly(false);
+      setTimeUp(false);
+      setCorrectAnswer(null);
+      setLastWrongAnswer({});
+      setCorrectPlayerUuids(new Set());
+      setRoundWonInfo(null);
+    });
+
+    socket.on('player_answered', (msg) => {
+      if (msg.is_correct) {
+        setCorrectPlayerUuids((prev) => new Set(prev).add(msg.player_uuid));
+        if (msg.player_uuid === uuid) {
+          setHasAnsweredCorrectly(true);
+        }
+      }
+      setPlayers((prev) =>
+        prev.map((p) =>
+          p.player_uuid === msg.player_uuid ? { ...p, points: msg.total_points } : p,
+        ),
+      );
+      if (!msg.is_correct && msg.answer) {
+        setLastWrongAnswer((prev) => ({ ...prev, [msg.player_uuid]: msg.answer }));
       }
     });
 
-    socket.addEventListener('close', (event) => {
-      if (event.code === 4404) {
+    socket.on('all_answered', (msg) => {
+      setCorrectAnswer(msg.correct_answer ?? null);
+    });
+
+    socket.on('time_up', (msg) => {
+      setTimeUp(true);
+      setTimeLeft(0);
+      setCorrectAnswer(msg.correct_answer ?? null);
+    });
+
+    socket.on('round_won', (msg) => {
+      setRoundWins(msg.round_wins ?? {});
+      setRoundWonInfo({ pseudo: msg.pseudo, round: msg.round });
+      setPlayers((prev) => prev.map((p) => ({ ...p, points: 0 })));
+    });
+
+    socket.on('game_finished', (msg) => {
+      setGameState('FINISHED');
+      setLeaderboard(msg.leaderboard ?? []);
+      setWinner(msg.winner ?? null);
+    });
+
+    socket.on('game_reset', () => {
+      setGameState('WAITING');
+      setCurrentQuestion(null);
+      setLeaderboard([]);
+      setWinner(null);
+      setRoundWins({});
+      setCurrentRound(1);
+      setCorrectPlayerUuids(new Set());
+      setLastWrongAnswer({});
+      setHasAnsweredCorrectly(false);
+      setTimeUp(false);
+      setCorrectAnswer(null);
+      setRoundWonInfo(null);
+      setPlayers((prev) => prev.map((p) => ({ ...p, points: 0 })));
+    });
+
+    socket.on('player_join', (msg) => {
+      if (msg.player) {
+        setPlayers((prev) => {
+          const exists = prev.some((p) => p.player_uuid === msg.player.player_uuid);
+          if (exists) {
+            return prev.map((p) =>
+              p.player_uuid === msg.player.player_uuid ? { ...p, ...msg.player } : p,
+            );
+          }
+          return [...prev, msg.player];
+        });
+      }
+    });
+
+    socket.on('player_leave', (msg) => {
+      if (msg.player_uuid) {
+        setPlayers((prev) => prev.filter((p) => p.player_uuid !== msg.player_uuid));
+      }
+    });
+
+    socket.on('config_update', (msg) => {
+      if (msg.configurations) {
+        setTargetScore(msg.configurations.score_objective);
+        setTargetScoreDraft(String(msg.configurations.score_objective));
+        setDuration(msg.configurations.question_duration);
+        setDurationDraft(String(msg.configurations.question_duration));
+        setRounds(msg.configurations.rounds_to_win);
+        setRoundsDraft(String(msg.configurations.rounds_to_win));
+        if (msg.configurations.show_answers !== undefined) {
+          setShowAnswers(msg.configurations.show_answers);
+        }
+      }
+    });
+
+    socket.on('chat_message', (msg) => {
+      setChatMessages((prev) => [...prev.slice(-99), {
+        player_uuid: msg.player_uuid,
+        pseudo: msg.pseudo ?? 'Anonyme',
+        text: msg.text,
+        timestamp: msg.timestamp,
+      }]);
+    });
+
+    socket.on('error', (msg) => {
+      alert(msg.message);
+    });
+
+    socket.on('connect_error', (err) => {
+      if (err.message === 'Room introuvable') {
         navigate('/public-games');
       }
     });
 
-    const ping = window.setInterval(() => {
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: 'ping' }));
-      }
-    }, 8000);
-
     return () => {
-      window.clearInterval(ping);
-      try {
-        socket.close();
-      } catch {
-        // ignore
-      }
+      socket.disconnect();
       socketRef.current = null;
       setWsReady(false);
     };
@@ -508,33 +493,33 @@ function LobbyPage() {
     const clamped = clampInput(targetScoreDraft, 10, 1500, targetScore);
     setTargetScore(clamped);
     setTargetScoreDraft(String(clamped));
-    if (isOwner) sendWsMessage({ type: 'update_config', data: { score_objective: clamped } });
+    if (isOwner) sendWsMessage('update_config', { score_objective: clamped });
   };
 
   const handleDurationBlur = () => {
     const clamped = clampInput(durationDraft, 5, 60, duration);
     setDuration(clamped);
     setDurationDraft(String(clamped));
-    if (isOwner) sendWsMessage({ type: 'update_config', data: { question_duration: clamped } });
+    if (isOwner) sendWsMessage('update_config', { question_duration: clamped });
   };
 
   const handleRoundsBlur = () => {
     const clamped = clampInput(roundsDraft, 1, 50, rounds);
     setRounds(clamped);
     setRoundsDraft(String(clamped));
-    if (isOwner) sendWsMessage({ type: 'update_config', data: { rounds_to_win: clamped } });
+    if (isOwner) sendWsMessage('update_config', { rounds_to_win: clamped });
   };
 
   const handleSubmitAnswer = () => {
     if (!myAnswer.trim() || hasAnsweredCorrectly || timeUp) return;
-    sendWsMessage({ type: 'submit_answer', answer: myAnswer.trim() });
+    sendWsMessage('submit_answer', { answer: myAnswer.trim() });
     setMyAnswer('');
   };
 
   const handleSendChat = () => {
     const text = chatInput.trim();
     if (!text) return;
-    sendWsMessage({ type: 'chat_message', text });
+    sendWsMessage('chat_message', { text });
     setChatInput('');
   };
 
@@ -672,7 +657,7 @@ function LobbyPage() {
           <button
             type="button"
             className="btn-join"
-            onClick={() => sendWsMessage({ type: 'start_game' })}
+            onClick={() => sendWsMessage('start_game')}
           >
             LANCER LA PARTIE
           </button>
@@ -904,7 +889,7 @@ function LobbyPage() {
                   checked={showAnswers}
                   onChange={(e) => {
                     setShowAnswers(e.target.checked);
-                    sendWsMessage({ type: 'update_config', data: { show_answers: e.target.checked } });
+                    sendWsMessage('update_config', { show_answers: e.target.checked });
                   }}
                 />
                 <span className="toggle-label">Montrer les mauvaises réponses</span>
@@ -917,7 +902,7 @@ function LobbyPage() {
                 className="btn-end-game"
                 onClick={() => {
                   if (window.confirm('Terminer la partie ? Tous les joueurs seront renvoyés au lobby.')) {
-                    sendWsMessage({ type: 'end_game' });
+                    sendWsMessage('end_game');
                   }
                 }}
               >
