@@ -1,11 +1,11 @@
 import asyncio
-import json
 import random
 from datetime import datetime, timezone
 from math import floor
 from typing import Dict, Optional
+from urllib.parse import parse_qs
 
-from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
+import socketio
 
 from app.core.config import (
     DELAY_AFTER_ALL_ANSWERED,
@@ -14,57 +14,41 @@ from app.core.config import (
     DELAY_AFTER_TIME_UP,
     MAX_POINTS_FIRST,
     QUESTION_BATCH_SIZE,
-    WS_RECEIVE_TIMEOUT,
 )
 
-ws_router = APIRouter()
+sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 
 
 def _now_ms() -> int:
     return int(datetime.now(timezone.utc).timestamp() * 1000)
 
 
-class ConnectionManager:
+class GameManager:
     def __init__(self):
-        self.rooms: Dict[str, Dict[str, WebSocket]] = {}
         self.room_timers: Dict[str, asyncio.Task] = {}
         self.room_transition_tasks: Dict[str, asyncio.Task] = {}
         self.playing_since: Dict[str, Dict[str, int]] = {}
         self.chat_timestamps: Dict[str, list[float]] = {}
+        self.sid_map: Dict[str, tuple[str, str]] = {}  # sid -> (room_code, player_uuid)
+        self.uuid_to_sid: Dict[str, Dict[str, str]] = {}  # room_code -> {player_uuid -> sid}
 
-    def connect(self, room_code: str, player_uuid: str, ws: WebSocket):
-        if room_code not in self.rooms:
-            self.rooms[room_code] = {}
-        self.rooms[room_code][player_uuid] = ws
+    def register(self, sid: str, room_code: str, player_uuid: str):
+        self.sid_map[sid] = (room_code, player_uuid)
+        self.uuid_to_sid.setdefault(room_code, {})[player_uuid] = sid
 
-    def disconnect(self, room_code: str, player_uuid: str):
-        room = self.rooms.get(room_code)
-        if room:
-            room.pop(player_uuid, None)
-            if not room:
-                del self.rooms[room_code]
+    def unregister(self, sid: str) -> tuple[str, str] | None:
+        info = self.sid_map.pop(sid, None)
+        if info:
+            room_code, player_uuid = info
+            room_sids = self.uuid_to_sid.get(room_code, {})
+            if room_sids.get(player_uuid) == sid:
+                del room_sids[player_uuid]
+                if not room_sids:
+                    self.uuid_to_sid.pop(room_code, None)
+        return info
 
-    async def broadcast(self, room_code: str, message: dict, *, exclude: str | None = None):
-        room = self.rooms.get(room_code)
-        if not room:
-            return
-        payload = json.dumps(message)
-        dead: list[str] = []
-        for uid, ws in room.items():
-            if uid == exclude:
-                continue
-            try:
-                await ws.send_text(payload)
-            except Exception:
-                dead.append(uid)
-        for uid in dead:
-            room.pop(uid, None)
-
-    async def send_personal(self, ws: WebSocket, message: dict):
-        try:
-            await ws.send_text(json.dumps(message))
-        except Exception:
-            pass
+    def get_sid(self, room_code: str, player_uuid: str) -> str | None:
+        return self.uuid_to_sid.get(room_code, {}).get(player_uuid)
 
     def cancel_timer(self, room_code: str):
         task = self.room_timers.pop(room_code, None)
@@ -118,7 +102,7 @@ class ConnectionManager:
                 await user.save()
 
 
-manager = ConnectionManager()
+manager = GameManager()
 
 
 def _player_dict(player) -> dict:
@@ -203,8 +187,7 @@ async def _send_next_question(room_code: str):
         room.game_data.used_question_ids.append(q_id)
     await room.save()
 
-    await manager.broadcast(room_code, {
-        "type": "new_question",
+    await sio.emit("new_question", {
         "question_index": room.game_data.current_question_index,
         "total_questions": len(room.game_data.question_ids),
         "question": question.question,
@@ -212,7 +195,7 @@ async def _send_next_question(room_code: str):
         "image_url": str(question.image_url) if question.image_url else None,
         "time_limit": room.configurations.question_duration,
         "round": room.game_data.actual_round,
-    })
+    }, room=room_code)
 
     manager.cancel_timer(room_code)
     manager.room_timers[room_code] = asyncio.create_task(
@@ -234,10 +217,9 @@ async def _question_timer(room_code: str, duration: int):
                 if q and q.answers:
                     correct_answer = q.answers[0]
 
-        await manager.broadcast(room_code, {
-            "type": "time_up",
+        await sio.emit("time_up", {
             "correct_answer": correct_answer,
-        })
+        }, room=room_code)
         await asyncio.sleep(DELAY_AFTER_TIME_UP)
         await _advance_question(room_code)
     except asyncio.CancelledError:
@@ -285,10 +267,9 @@ async def _check_all_answered(room_code: str):
                     if q and q.answers:
                         correct_answer = q.answers[0]
 
-            await manager.broadcast(room_code, {
-                "type": "all_answered",
+            await sio.emit("all_answered", {
                 "correct_answer": correct_answer,
-            })
+            }, room=room_code)
             await asyncio.sleep(DELAY_AFTER_ALL_ANSWERED)
             await _advance_question(room_code)
     except asyncio.CancelledError:
@@ -319,13 +300,12 @@ async def _check_round_end(room_code: str, player_uuid: str):
         room.game_data.round_wins[player_uuid] = wins
         await room.save()
 
-        await manager.broadcast(room_code, {
-            "type": "round_won",
+        await sio.emit("round_won", {
             "player_uuid": player_uuid,
             "pseudo": player.pseudo,
             "round": room.game_data.actual_round,
             "round_wins": room.game_data.round_wins,
-        })
+        }, room=room_code)
 
         if wins >= room.configurations.rounds_to_win:
             await _end_game(room_code, winner_uuid=player_uuid)
@@ -396,12 +376,11 @@ async def _end_game(room_code: str, *, winner_uuid: Optional[str] = None, reason
             "rounds_won": top["rounds_won"],
         }
 
-    await manager.broadcast(room_code, {
-        "type": "game_finished",
+    await sio.emit("game_finished", {
         "winner": winner_data,
         "leaderboard": leaderboard,
         "reason": reason,
-    })
+    }, room=room_code)
 
     await asyncio.sleep(DELAY_AFTER_GAME_FINISHED)
 
@@ -414,41 +393,36 @@ async def _end_game(room_code: str, *, winner_uuid: Optional[str] = None, reason
         p.points = 0
     await room.save()
 
-    await manager.broadcast(room_code, {
-        "type": "game_reset",
+    await sio.emit("game_reset", {
         "game_state": "WAITING",
-    })
+    }, room=room_code)
 
 
-@ws_router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    try:
-        while True:
-            message = await websocket.receive_text()
-            await websocket.send_text(f"echo: {message}")
-    except WebSocketDisconnect:
-        pass
+# --- Socket.IO event handlers ---
 
-
-@ws_router.websocket("/ws/rooms/{room_code}")
-async def room_websocket_endpoint(
-    websocket: WebSocket,
-    room_code: str,
-    player_uuid: str = Query(..., min_length=1),
-    pseudo: str | None = Query(default=None, min_length=1, max_length=64),
-):
+@sio.event
+async def connect(sid, environ, auth):
     from app.db.client import ensure_db
-    from app.models.question import QuestionDocument
-    from app.models.room import AnsweredPlayer, GameState, PlayerInfo, RoomDocument
+    from app.models.room import GameState, PlayerInfo, RoomDocument
 
     await ensure_db()
-    await websocket.accept()
+
+    qs = parse_qs(environ.get("QUERY_STRING", ""))
+    room_code = (qs.get("room_code", [""])[0]).upper()
+    player_uuid = qs.get("player_uuid", [""])[0]
+    pseudo = qs.get("pseudo", [None])[0]
+
+    if not room_code or not player_uuid:
+        raise ConnectionRefusedError("room_code et player_uuid requis")
 
     room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
     if not room:
-        await websocket.close(code=4404)
-        return
+        raise ConnectionRefusedError("Room introuvable")
+
+    # Multi-tab: disconnect old sid for same player in same room
+    old_sid = manager.get_sid(room_code, player_uuid)
+    if old_sid and old_sid != sid:
+        await sio.disconnect(old_sid)
 
     now_ms = _now_ms()
     existing = room.find_player(player_uuid)
@@ -470,7 +444,8 @@ async def room_websocket_endpoint(
         await room.save()
 
     room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
-    manager.connect(room_code, player_uuid, websocket)
+    manager.register(sid, room_code, player_uuid)
+    sio.enter_room(sid, room_code)
 
     if room.game_state == GameState.PLAYING:
         manager.start_playing_one(room_code, player_uuid)
@@ -478,7 +453,6 @@ async def room_websocket_endpoint(
     player_info = room.find_player(player_uuid)
 
     room_state_msg = {
-        "type": "room_state",
         "players": [_player_dict(p) for p in room.players_info if p.is_connected],
         "configurations": _config_dict(room.configurations),
         "game_state": room.game_state.value,
@@ -490,7 +464,6 @@ async def room_websocket_endpoint(
             q_id = room.game_data.question_ids[idx]
             question = await _fetch_question(q_id)
             if question:
-                elapsed_ms = _now_ms() - (room.game_data.started_at or _now_ms())
                 room_state_msg["current_question"] = {
                     "question": question.question,
                     "question_type": question.question_type.value,
@@ -510,212 +483,265 @@ async def room_websocket_endpoint(
                 ]
                 room_state_msg["round_wins"] = room.game_data.round_wins
 
-    try:
-        await manager.send_personal(websocket, room_state_msg)
+    await sio.emit("room_state", room_state_msg, to=sid)
 
-        if player_info:
-            await manager.broadcast(room_code, {
-                "type": "player_join",
-                "player": _player_dict(player_info),
-            }, exclude=player_uuid)
+    if player_info:
+        await sio.emit("player_join", {
+            "player": _player_dict(player_info),
+        }, room=room_code, skip_sid=sid)
 
-        while True:
-            raw = await asyncio.wait_for(websocket.receive_text(), timeout=WS_RECEIVE_TIMEOUT)
 
-            try:
-                msg = json.loads(raw)
-            except (json.JSONDecodeError, ValueError):
-                msg = {"type": "ping"} if raw.strip().lower() == "ping" else {"type": "unknown"}
+@sio.event
+async def disconnect(sid):
+    from app.models.room import GameState, RoomDocument
 
-            msg_type = msg.get("type", "")
+    info = manager.unregister(sid)
+    if not info:
+        return
 
-            if msg_type == "ping":
-                room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
-                if room:
-                    player = room.find_player(player_uuid)
-                    if player:
-                        player.last_seen_at = _now_ms()
-                        await room.save()
+    room_code, player_uuid = info
+    sio.leave_room(sid, room_code)
 
-            elif msg_type == "start_game":
-                room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
-                if not room:
-                    break
-                player = room.find_player(player_uuid)
-                if player and player.is_owner and room.game_state == GameState.WAITING:
-                    q_ids = await _fetch_question_batch(exclude_ids=[], size=QUESTION_BATCH_SIZE)
-                    if not q_ids:
-                        await manager.send_personal(websocket, {
-                            "type": "error",
-                            "message": "Aucune question disponible en base de données.",
-                        })
-                        continue
+    room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
+    if room:
+        if room.game_state == GameState.PLAYING:
+            await manager.flush_playtime(room_code, player_uuid)
 
-                    room.game_state = GameState.PLAYING
-                    room.game_data.started_at = _now_ms()
-                    room.game_data.question_ids = q_ids
-                    room.game_data.current_question_index = 0
-                    room.game_data.first_correct_at = None
-                    room.game_data.answered_players = []
-                    room.game_data.round_wins = {}
-                    room.game_data.actual_round = 1
-                    room.game_data.used_question_ids = []
-                    for p in room.players_info:
-                        p.points = 0
-                    await room.save()
+        await room.mark_player_disconnected(player_uuid=player_uuid, now_ms=_now_ms())
 
-                    connected_uuids = [p.player_uuid for p in room.players_info if p.is_connected]
-                    manager.start_playing(room_code, connected_uuids)
+        await sio.emit("player_leave", {
+            "player_uuid": player_uuid,
+        }, room=room_code)
 
-                    await manager.broadcast(room_code, {
-                        "type": "game_started",
-                        "game_state": "PLAYING",
-                        "started_at": room.game_data.started_at,
-                    })
+        await room.close_if_empty()
 
-                    await _send_next_question(room_code)
 
-            elif msg_type == "submit_answer":
-                room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
-                if not room or room.game_state != GameState.PLAYING:
-                    continue
+@sio.on("ping")
+async def handle_ping(sid, data=None):
+    from app.models.room import RoomDocument
 
-                answer_text = str(msg.get("answer", "")).strip()
-                if not answer_text:
-                    continue
+    info = manager.sid_map.get(sid)
+    if not info:
+        return
+    room_code, player_uuid = info
 
-                already_correct = any(
-                    ap.player_uuid == player_uuid and ap.is_correct
-                    for ap in room.game_data.answered_players
-                )
-                if already_correct:
-                    continue
+    room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
+    if room:
+        player = room.find_player(player_uuid)
+        if player:
+            player.last_seen_at = _now_ms()
+            await room.save()
 
-                idx = room.game_data.current_question_index
-                if idx >= len(room.game_data.question_ids):
-                    continue
-                q_id = room.game_data.question_ids[idx]
-                question = await _fetch_question(q_id)
-                if not question:
-                    continue
 
-                is_correct = any(
-                    answer_text.lower() == valid.strip().lower()
-                    for valid in question.answers
-                )
+@sio.on("start_game")
+async def handle_start_game(sid, data=None):
+    from app.models.room import GameState, RoomDocument
 
-                now = _now_ms()
-                points = 0
-                if is_correct:
-                    if room.game_data.first_correct_at is None:
-                        room.game_data.first_correct_at = now
-                        points = MAX_POINTS_FIRST
-                    else:
-                        diff_seconds = (now - room.game_data.first_correct_at) / 1000.0
-                        points = max(0, MAX_POINTS_FIRST - floor(diff_seconds))
-                        if points == MAX_POINTS_FIRST:
-                            points = MAX_POINTS_FIRST - 1
+    info = manager.sid_map.get(sid)
+    if not info:
+        return
+    room_code, player_uuid = info
 
-                    player = room.find_player(player_uuid)
-                    if player:
-                        player.points += points
+    room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
+    if not room:
+        return
+    player = room.find_player(player_uuid)
+    if not player or not player.is_owner or room.game_state != GameState.WAITING:
+        return
 
-                should_record = is_correct or room.configurations.show_answers
-                if should_record:
-                    room.game_data.answered_players.append(AnsweredPlayer(
-                        player_uuid=player_uuid,
-                        answered_at=now,
-                        is_correct=is_correct,
-                        answer=answer_text,
-                        points_awarded=points,
-                    ))
+    q_ids = await _fetch_question_batch(exclude_ids=[], size=QUESTION_BATCH_SIZE)
+    if not q_ids:
+        await sio.emit("error", {
+            "message": "Aucune question disponible en base de données.",
+        }, to=sid)
+        return
 
-                await room.save()
+    room.game_state = GameState.PLAYING
+    room.game_data.started_at = _now_ms()
+    room.game_data.question_ids = q_ids
+    room.game_data.current_question_index = 0
+    room.game_data.first_correct_at = None
+    room.game_data.answered_players = []
+    room.game_data.round_wins = {}
+    room.game_data.actual_round = 1
+    room.game_data.used_question_ids = []
+    for p in room.players_info:
+        p.points = 0
+    await room.save()
 
-                player = room.find_player(player_uuid)
-                broadcast_answer = None
-                if not is_correct and room.configurations.show_answers:
-                    broadcast_answer = answer_text
+    connected_uuids = [p.player_uuid for p in room.players_info if p.is_connected]
+    manager.start_playing(room_code, connected_uuids)
 
-                await manager.broadcast(room_code, {
-                    "type": "player_answered",
-                    "player_uuid": player_uuid,
-                    "pseudo": player.pseudo if player else None,
-                    "is_correct": is_correct,
-                    "answer": broadcast_answer,
-                    "points_awarded": points,
-                    "total_points": player.points if player else 0,
-                })
+    await sio.emit("game_started", {
+        "game_state": "PLAYING",
+        "started_at": room.game_data.started_at,
+    }, room=room_code)
 
-                if is_correct:
-                    asyncio.create_task(_check_round_end(room_code, player_uuid))
+    await _send_next_question(room_code)
 
-            elif msg_type == "end_game":
-                room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
-                if not room:
-                    break
-                player = room.find_player(player_uuid)
-                if player and player.is_owner and room.game_state == GameState.PLAYING:
-                    await _end_game(room_code, reason="owner_ended")
 
-            elif msg_type == "chat_message":
-                text = str(msg.get("text", "")).strip()
-                if not text or len(text) > 300:
-                    continue
-                now_t = asyncio.get_event_loop().time()
-                ts_list = manager.chat_timestamps.get(player_uuid, [])
-                ts_list = [t for t in ts_list if now_t - t < 1.0]
-                if len(ts_list) >= 3:
-                    continue
-                ts_list.append(now_t)
-                manager.chat_timestamps[player_uuid] = ts_list
+@sio.on("submit_answer")
+async def handle_submit_answer(sid, data=None):
+    from app.models.room import AnsweredPlayer, GameState, RoomDocument
 
-                room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
-                player = room.find_player(player_uuid) if room else None
-                await manager.broadcast(room_code, {
-                    "type": "chat_message",
-                    "player_uuid": player_uuid,
-                    "pseudo": player.pseudo if player else None,
-                    "text": text,
-                    "timestamp": _now_ms(),
-                })
+    info = manager.sid_map.get(sid)
+    if not info:
+        return
+    room_code, player_uuid = info
 
-            elif msg_type == "update_config":
-                room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
-                if not room:
-                    break
-                player = room.find_player(player_uuid)
-                if player and player.is_owner:
-                    data = msg.get("data", {})
-                    if "score_objective" in data:
-                        room.configurations.score_objective = max(1, int(data["score_objective"]))
-                    if "question_duration" in data:
-                        room.configurations.question_duration = max(1, int(data["question_duration"]))
-                    if "rounds_to_win" in data:
-                        room.configurations.rounds_to_win = max(1, int(data["rounds_to_win"]))
-                    if "show_answers" in data:
-                        room.configurations.show_answers = bool(data["show_answers"])
-                    await room.save()
+    data = data or {}
 
-                    await manager.broadcast(room_code, {
-                        "type": "config_update",
-                        "configurations": _config_dict(room.configurations),
-                    })
+    room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
+    if not room or room.game_state != GameState.PLAYING:
+        return
 
-    except (WebSocketDisconnect, asyncio.TimeoutError):
-        pass
-    finally:
-        manager.disconnect(room_code, player_uuid)
-        room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
-        if room:
-            if room.game_state == GameState.PLAYING:
-                await manager.flush_playtime(room_code, player_uuid)
+    answer_text = str(data.get("answer", "")).strip()
+    if not answer_text:
+        return
 
-            await room.mark_player_disconnected(player_uuid=player_uuid, now_ms=_now_ms())
+    already_correct = any(
+        ap.player_uuid == player_uuid and ap.is_correct
+        for ap in room.game_data.answered_players
+    )
+    if already_correct:
+        return
 
-            await manager.broadcast(room_code, {
-                "type": "player_leave",
-                "player_uuid": player_uuid,
-            })
+    idx = room.game_data.current_question_index
+    if idx >= len(room.game_data.question_ids):
+        return
+    q_id = room.game_data.question_ids[idx]
+    question = await _fetch_question(q_id)
+    if not question:
+        return
 
-            await room.close_if_empty()
+    is_correct = any(
+        answer_text.lower() == valid.strip().lower()
+        for valid in question.answers
+    )
+
+    now = _now_ms()
+    points = 0
+    if is_correct:
+        if room.game_data.first_correct_at is None:
+            room.game_data.first_correct_at = now
+            points = MAX_POINTS_FIRST
+        else:
+            diff_seconds = (now - room.game_data.first_correct_at) / 1000.0
+            points = max(0, MAX_POINTS_FIRST - floor(diff_seconds))
+            if points == MAX_POINTS_FIRST:
+                points = MAX_POINTS_FIRST - 1
+
+        player = room.find_player(player_uuid)
+        if player:
+            player.points += points
+
+    should_record = is_correct or room.configurations.show_answers
+    if should_record:
+        room.game_data.answered_players.append(AnsweredPlayer(
+            player_uuid=player_uuid,
+            answered_at=now,
+            is_correct=is_correct,
+            answer=answer_text,
+            points_awarded=points,
+        ))
+
+    await room.save()
+
+    player = room.find_player(player_uuid)
+    broadcast_answer = None
+    if not is_correct and room.configurations.show_answers:
+        broadcast_answer = answer_text
+
+    await sio.emit("player_answered", {
+        "player_uuid": player_uuid,
+        "pseudo": player.pseudo if player else None,
+        "is_correct": is_correct,
+        "answer": broadcast_answer,
+        "points_awarded": points,
+        "total_points": player.points if player else 0,
+    }, room=room_code)
+
+    if is_correct:
+        asyncio.create_task(_check_round_end(room_code, player_uuid))
+
+
+@sio.on("end_game")
+async def handle_end_game(sid, data=None):
+    from app.models.room import GameState, RoomDocument
+
+    info = manager.sid_map.get(sid)
+    if not info:
+        return
+    room_code, player_uuid = info
+
+    room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
+    if not room:
+        return
+    player = room.find_player(player_uuid)
+    if player and player.is_owner and room.game_state == GameState.PLAYING:
+        await _end_game(room_code, reason="owner_ended")
+
+
+@sio.on("chat_message")
+async def handle_chat_message(sid, data=None):
+    from app.models.room import RoomDocument
+
+    info = manager.sid_map.get(sid)
+    if not info:
+        return
+    room_code, player_uuid = info
+
+    data = data or {}
+    text = str(data.get("text", "")).strip()
+    if not text or len(text) > 300:
+        return
+
+    now_t = asyncio.get_event_loop().time()
+    ts_list = manager.chat_timestamps.get(player_uuid, [])
+    ts_list = [t for t in ts_list if now_t - t < 1.0]
+    if len(ts_list) >= 3:
+        return
+    ts_list.append(now_t)
+    manager.chat_timestamps[player_uuid] = ts_list
+
+    room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
+    player = room.find_player(player_uuid) if room else None
+    await sio.emit("chat_message", {
+        "player_uuid": player_uuid,
+        "pseudo": player.pseudo if player else None,
+        "text": text,
+        "timestamp": _now_ms(),
+    }, room=room_code)
+
+
+@sio.on("update_config")
+async def handle_update_config(sid, data=None):
+    from app.models.room import RoomDocument
+
+    info = manager.sid_map.get(sid)
+    if not info:
+        return
+    room_code, player_uuid = info
+
+    data = data or {}
+
+    room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
+    if not room:
+        return
+    player = room.find_player(player_uuid)
+    if not player or not player.is_owner:
+        return
+
+    if "score_objective" in data:
+        room.configurations.score_objective = max(1, int(data["score_objective"]))
+    if "question_duration" in data:
+        room.configurations.question_duration = max(1, int(data["question_duration"]))
+    if "rounds_to_win" in data:
+        room.configurations.rounds_to_win = max(1, int(data["rounds_to_win"]))
+    if "show_answers" in data:
+        room.configurations.show_answers = bool(data["show_answers"])
+    await room.save()
+
+    await sio.emit("config_update", {
+        "configurations": _config_dict(room.configurations),
+    }, room=room_code)
