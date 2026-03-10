@@ -1,5 +1,4 @@
 import asyncio
-import random
 from datetime import datetime, timezone
 from math import floor
 from typing import Dict, Optional
@@ -31,6 +30,8 @@ class GameManager:
         self.chat_timestamps: Dict[str, list[float]] = {}
         self.sid_map: Dict[str, tuple[str, str]] = {}  # sid -> (room_code, player_uuid)
         self.uuid_to_sid: Dict[str, Dict[str, str]] = {}  # room_code -> {player_uuid -> sid}
+        self.question_cache: Dict[int, object] = {}  # question_id -> QuestionDocument
+        self.last_ping_persist: Dict[str, float] = {}  # sid -> last persist timestamp
 
     def register(self, sid: str, room_code: str, player_uuid: str):
         self.sid_map[sid] = (room_code, player_uuid)
@@ -38,6 +39,7 @@ class GameManager:
 
     def unregister(self, sid: str) -> tuple[str, str] | None:
         info = self.sid_map.pop(sid, None)
+        self.last_ping_persist.pop(sid, None)
         if info:
             room_code, player_uuid = info
             room_sids = self.uuid_to_sid.get(room_code, {})
@@ -125,8 +127,14 @@ def _config_dict(configurations) -> dict:
 
 
 async def _fetch_question(question_id: int):
+    cached = manager.question_cache.get(question_id)
+    if cached:
+        return cached
     from app.models.question import QuestionDocument
-    return await QuestionDocument.find_one(QuestionDocument.question_id == question_id)
+    q = await QuestionDocument.find_one(QuestionDocument.question_id == question_id)
+    if q:
+        manager.question_cache[question_id] = q
+    return q
 
 
 async def _fetch_question_batch(exclude_ids: list[int], size: int = QUESTION_BATCH_SIZE) -> list[int]:
@@ -402,10 +410,7 @@ async def _end_game(room_code: str, *, winner_uuid: Optional[str] = None, reason
 
 @sio.event
 async def connect(sid, environ, auth):
-    from app.db.client import ensure_db
     from app.models.room import GameState, PlayerInfo, RoomDocument
-
-    await ensure_db()
 
     qs = parse_qs(environ.get("QUERY_STRING", ""))
     room_code = (qs.get("room_code", [""])[0]).upper()
@@ -518,13 +523,18 @@ async def disconnect(sid):
 
 @sio.on("ping")
 async def handle_ping(sid, data=None):
-    from app.models.room import RoomDocument
-
     info = manager.sid_map.get(sid)
     if not info:
         return
-    room_code, player_uuid = info
 
+    now = asyncio.get_event_loop().time()
+    last = manager.last_ping_persist.get(sid, 0)
+    if now - last < 60:
+        return
+    manager.last_ping_persist[sid] = now
+
+    room_code, player_uuid = info
+    from app.models.room import RoomDocument
     room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
     if room:
         player = room.find_player(player_uuid)

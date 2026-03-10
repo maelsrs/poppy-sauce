@@ -4,6 +4,7 @@ from typing import Optional
 from uuid import uuid4
 
 from beanie import Document
+from beanie.odm.fields import Indexed
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -13,11 +14,11 @@ class UserRank(str, Enum):
 
 
 class UserDocument(Document):
-    uuid: str = Field(default_factory=lambda: str(uuid4()), index=True)
-    username: str = Field(..., min_length=3, max_length=64, index=True)
+    uuid: Indexed(str, unique=True) = Field(default_factory=lambda: str(uuid4()))
+    username: Indexed(str, unique=True) = Field(..., min_length=3, max_length=64)
     password_hash: str = Field(..., min_length=8)
     rank: UserRank = Field(default=UserRank.USER)
-    email: EmailStr = Field(..., index=True)
+    email: Indexed(EmailStr, unique=True) = Field(...)
     last_login: Optional[datetime] = Field(default=None)
     level: int = Field(default=1, ge=0)
     first_login: Optional[datetime] = Field(default=None)
