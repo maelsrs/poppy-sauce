@@ -74,4 +74,6 @@ fastapi_app.include_router(auth_router)
 fastapi_app.include_router(rooms_router)
 fastapi_app.include_router(users_router)
 
-app = socketio_lib.ASGIApp(sio, other_app=fastapi_app)
+fastapi_app.mount("/socket.io", socketio_lib.ASGIApp(sio, socketio_path=""))
+
+app = fastapi_app
