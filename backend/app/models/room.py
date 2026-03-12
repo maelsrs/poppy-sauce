@@ -25,11 +25,17 @@ class GameState(str, Enum):
     FINISHED = "FINISHED"
 
 
+class CategoryConfig(BaseModel):
+    name: str = Field(..., min_length=1, max_length=64)
+    mode: str = Field(default="uniquement")
+
+
 class RoomConfigurations(BaseModel):
     score_objective: int = Field(default=100, ge=1)
     question_duration: int = Field(default=15, ge=1)
     rounds_to_win: int = Field(default=5, ge=1)
     show_answers: bool = Field(default=True)
+    categories: List[CategoryConfig] = Field(default_factory=list)
 
 
 class PlayerInfo(BaseModel):

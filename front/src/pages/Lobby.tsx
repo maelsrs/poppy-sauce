@@ -52,22 +52,15 @@ type LeaderboardEntry = {
 const sampleCategories: Category[] = [];
 
 const CATEGORY_POOL = [
-  'Culture pop',
-  'Histoire',
-  'Sciences',
-  'Géographie',
-  'Cinéma',
-  'Technologie',
-  'Sport',
-  'Musique',
-  'Littérature',
-  'Cuisine',
-  'Animaux',
-  'Art',
-  'Jeux vidéo',
-  'Nature',
-  'Mythologie',
-  'Voyages',
+  'Grand public', 'Facile', 'Moyen', 'Difficile',
+  '1940s', '1950s', '1960s', '1970s', '1980s', '1990s',
+  'Animaux', 'Anime & Manga', 'Architecture', 'Art', 'Associations',
+  'Bandes dessinées', 'Belgique', 'Capitales', 'Catch', 'Chanson française',
+  'Dessins animés', 'Drapeaux', 'Drapeaux locaux',
+  'Films', "Films d'animation", 'Football', 'Fruits & légumes',
+  'Game of Thrones', 'Géographie',
+  'Héraldique', 'Images', 'Informatique', 'Internet & Mèmes',
+  'J-pop', 'Jeux de société', 'Jeux indé', 'Jeux vidéo',
 ];
 
 // --- Icons ---
@@ -269,6 +262,13 @@ function LobbyPage() {
         if (msg.configurations.show_answers !== undefined) {
           setShowAnswers(msg.configurations.show_answers);
         }
+        if (msg.configurations.categories) {
+          setCategories(msg.configurations.categories.map((c: { name: string; mode: string }) => ({
+            id: crypto.randomUUID(),
+            name: c.name,
+            mode: c.mode as CategoryMode,
+          })));
+        }
       }
       if (msg.current_question) {
         const cq = msg.current_question;
@@ -422,6 +422,13 @@ function LobbyPage() {
         if (msg.configurations.show_answers !== undefined) {
           setShowAnswers(msg.configurations.show_answers);
         }
+        if (msg.configurations.categories) {
+          setCategories(msg.configurations.categories.map((c: { name: string; mode: string }) => ({
+            id: crypto.randomUUID(),
+            name: c.name,
+            mode: c.mode as CategoryMode,
+          })));
+        }
       }
     });
 
@@ -452,20 +459,36 @@ function LobbyPage() {
     };
   }, [authLoading, guestPseudo, navigate, roomCode, user]);
 
-  const toggleMode = (id: string) => {
-    setCategories((prev) =>
-      prev.map((cat) =>
-        cat.id === id ? { ...cat, mode: cat.mode === 'uniquement' ? 'enlever' : 'uniquement' } : cat,
-      ),
-    );
+  const syncCategories = (cats: Category[]) => {
+    if (isOwner) sendWsMessage('update_config', {
+      categories: cats.map((c) => ({ name: c.name, mode: c.mode })),
+    });
   };
 
-  const removeCategory = (id: string) => setCategories((prev) => prev.filter((cat) => cat.id !== id));
+  const toggleMode = (id: string) => {
+    setCategories((prev) => {
+      const next = prev.map((cat) =>
+        cat.id === id ? { ...cat, mode: (cat.mode === 'uniquement' ? 'enlever' : 'uniquement') as CategoryMode } : cat,
+      );
+      syncCategories(next);
+      return next;
+    });
+  };
+
+  const removeCategory = (id: string) => {
+    setCategories((prev) => {
+      const next = prev.filter((cat) => cat.id !== id);
+      syncCategories(next);
+      return next;
+    });
+  };
 
   const addCategoryFromName = (name: string) => {
     setCategories((prev) => {
       if (prev.some((cat) => cat.name.toLowerCase() === name.toLowerCase())) return prev;
-      return [...prev, { id: crypto.randomUUID(), name, mode: 'uniquement' }];
+      const next = [...prev, { id: crypto.randomUUID(), name, mode: 'uniquement' as CategoryMode }];
+      syncCategories(next);
+      return next;
     });
     setCategoryInput('');
   };
