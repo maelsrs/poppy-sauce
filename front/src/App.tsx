@@ -19,7 +19,7 @@ function App() {
         <div className="navbar__links">
           <Link to="/">Accueil</Link>
           <Link to="/public-games">Parties publiques</Link>
-          <a href="#" onClick={(e) => e.preventDefault()}>
+          <a href="https://tenor.com/fr/view/shrek-shrek-dance-dancing-shrek-gif-4002588423353146293" onClick={(e) => e.preventDefault()}>
             Discord
           </a>
         </div>
@@ -39,7 +39,9 @@ function App() {
       </main>
 
       <footer className="footer">
-        <a href="#">Discord</a>
+        <a href="https://tenor.com/fr/view/shrek-shrek-dance-dancing-shrek-gif-4002588423353146293" onClick={(e) => e.preventDefault()}>
+          Discord
+        </a>
       </footer>
     </div>
   );
