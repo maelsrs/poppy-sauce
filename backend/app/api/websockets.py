@@ -28,10 +28,10 @@ class GameManager:
         self.room_transition_tasks: Dict[str, asyncio.Task] = {}
         self.playing_since: Dict[str, Dict[str, int]] = {}
         self.chat_timestamps: Dict[str, list[float]] = {}
-        self.sid_map: Dict[str, tuple[str, str]] = {}  # sid -> (room_code, player_uuid)
-        self.uuid_to_sid: Dict[str, Dict[str, str]] = {}  # room_code -> {player_uuid -> sid}
-        self.question_cache: Dict[int, object] = {}  # question_id -> QuestionDocument
-        self.last_ping_persist: Dict[str, float] = {}  # sid -> last persist timestamp
+        self.sid_map: Dict[str, tuple[str, str]] = {}
+        self.uuid_to_sid: Dict[str, Dict[str, str]] = {}
+        self.question_cache: Dict[int, object] = {}
+        self.last_ping_persist: Dict[str, float] = {}
 
     def register(self, sid: str, room_code: str, player_uuid: str):
         self.sid_map[sid] = (room_code, player_uuid)
@@ -415,17 +415,14 @@ async def connect(sid, environ, auth):
     except ConnectionRefusedError:
         raise
     except Exception as e:
-        print(f"[connect] ERREUR: {type(e).__name__}: {e}", flush=True)
+        print(f"[connect] error: {type(e).__name__}: {e}", flush=True)
         raise ConnectionRefusedError(f"Erreur interne: {e}")
 
 
 async def _handle_connect(sid, environ):
     from app.models.room import GameState, PlayerInfo, RoomDocument
 
-    raw_qs = environ.get("query_string", b"")
-    if isinstance(raw_qs, bytes):
-        raw_qs = raw_qs.decode()
-    qs = parse_qs(raw_qs)
+    qs = parse_qs(environ.get("QUERY_STRING", ""))
     room_code = (qs.get("room_code", [""])[0]).upper()
     player_uuid = qs.get("player_uuid", [""])[0]
     pseudo = qs.get("pseudo", [None])[0]
@@ -437,7 +434,6 @@ async def _handle_connect(sid, environ):
     if not room:
         raise ConnectionRefusedError("Room introuvable")
 
-    # Multi-tab: disconnect old sid for same player in same room
     old_sid = manager.get_sid(room_code, player_uuid)
     if old_sid and old_sid != sid:
         await sio.disconnect(old_sid)
@@ -463,7 +459,12 @@ async def _handle_connect(sid, environ):
 
     room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
     manager.register(sid, room_code, player_uuid)
-    sio.enter_room(sid, room_code)
+
+    async def _join_room_delayed():
+        await asyncio.sleep(0.1)
+        await sio.enter_room(sid, room_code)
+
+    asyncio.create_task(_join_room_delayed())
 
     if room.game_state == GameState.PLAYING:
         manager.start_playing_one(room_code, player_uuid)
@@ -518,7 +519,7 @@ async def disconnect(sid):
         return
 
     room_code, player_uuid = info
-    sio.leave_room(sid, room_code)
+    await sio.leave_room(sid, room_code)
 
     room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
     if room:
