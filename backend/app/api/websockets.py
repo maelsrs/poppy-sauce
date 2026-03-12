@@ -410,6 +410,16 @@ async def _end_game(room_code: str, *, winner_uuid: Optional[str] = None, reason
 
 @sio.event
 async def connect(sid, environ, auth):
+    try:
+        return await _handle_connect(sid, environ)
+    except ConnectionRefusedError:
+        raise
+    except Exception as e:
+        print(f"[connect] ERREUR: {type(e).__name__}: {e}", flush=True)
+        raise ConnectionRefusedError(f"Erreur interne: {e}")
+
+
+async def _handle_connect(sid, environ):
     from app.models.room import GameState, PlayerInfo, RoomDocument
 
     raw_qs = environ.get("query_string", b"")

@@ -78,17 +78,17 @@ function HomePage() {
       <section className="column column--sidebar">
         <div className="account-card">
           <div className="account-card__header">
-            <p className="account-card__eyebrow">{user ? 'Connecté' : 'Espace compte'}</p>
+            <p className="account-card__eyebrow">{authLoading ? '\u00A0' : user ? 'Connecté' : 'Espace compte'}</p>
             <h2 className="account-card__title">
-              {user ? `Bienvenue, ${user.username}` : 'Connexion ou inscription'}
+              {authLoading ? '\u00A0' : user ? `Bienvenue, ${user.username}` : 'Connexion ou inscription'}
             </h2>
             <p className="account-card__hint">
-              {user ? user.email : 'Rejoins le lobby pour créer ou rejoindre des parties.'}
+              {authLoading ? '\u00A0' : user ? user.email : 'Rejoins le lobby pour créer ou rejoindre des parties.'}
             </p>
           </div>
 
           <div className="account-card__actions">
-            {user ? (
+            {authLoading ? null : user ? (
               <button
                 type="button"
                 className="account-card__btn account-card__btn--ghost"
