@@ -103,7 +103,8 @@ function LobbyPage() {
   const params = useParams();
   const roomCode = (params.code ?? '').toUpperCase();
   const { user, loading: authLoading } = useAuth();
-  const [configOpen, setConfigOpen] = useState(true);
+  const [configOpen, setConfigOpen] = useState(false);
+  const configInitRef = useRef(false);
   const [targetScore, setTargetScore] = useState(100);
   const [targetScoreDraft, setTargetScoreDraft] = useState('100');
   const [duration, setDuration] = useState(20);
@@ -156,6 +157,13 @@ function LobbyPage() {
     () => players.some((p) => p.player_uuid === playerUuid && p.is_owner),
     [players, playerUuid],
   );
+
+  useEffect(() => {
+    if (players.length > 0 && !configInitRef.current) {
+      configInitRef.current = true;
+      if (isOwner) setConfigOpen(true);
+    }
+  }, [players, isOwner]);
 
   const sendWsMessage = useCallback((event: string, data?: object) => {
     const socket = socketRef.current;
@@ -888,6 +896,7 @@ function LobbyPage() {
                 onChange={setTargetScoreDraft}
                 onBlur={handleTargetBlur}
                 placeholder="100"
+                disabled={!isOwner}
               />
               <Field
                 label="Temps (s)"
@@ -896,6 +905,7 @@ function LobbyPage() {
                 onChange={setDurationDraft}
                 onBlur={handleDurationBlur}
                 placeholder="20"
+                disabled={!isOwner}
               />
               <Field
                 label="Rounds"
@@ -904,22 +914,22 @@ function LobbyPage() {
                 onChange={setRoundsDraft}
                 onBlur={handleRoundsBlur}
                 placeholder="1"
+                disabled={!isOwner}
               />
             </div>
 
-            {isOwner && (
-              <label className="toggle-row">
-                <input
-                  type="checkbox"
-                  checked={showAnswers}
-                  onChange={(e) => {
-                    setShowAnswers(e.target.checked);
-                    sendWsMessage('update_config', { show_answers: e.target.checked });
-                  }}
-                />
-                <span className="toggle-label">Montrer les mauvaises réponses</span>
-              </label>
-            )}
+            <label className={`toggle-row ${!isOwner ? 'toggle-row--disabled' : ''}`}>
+              <input
+                type="checkbox"
+                checked={showAnswers}
+                disabled={!isOwner}
+                onChange={(e) => {
+                  setShowAnswers(e.target.checked);
+                  sendWsMessage('update_config', { show_answers: e.target.checked });
+                }}
+              />
+              <span className="toggle-label">Montrer les mauvaises réponses</span>
+            </label>
 
             {isOwner && gameState === 'PLAYING' && (
               <button
@@ -945,55 +955,62 @@ function LobbyPage() {
 
               <div className="category-list">
                 {categories.map((cat) => (
-                  <div key={cat.id} className="category-item">
+                  <div key={cat.id} className={`category-item ${!isOwner ? 'category-item--disabled' : ''}`}>
                     <span className="cat-name">{cat.name}</span>
-                    <div className="cat-actions">
-                      <button
-                        type="button"
-                        className={`btn-mode ${cat.mode}`}
-                        onClick={() => toggleMode(cat.id)}
-                      >
-                        {cat.mode === 'uniquement' ? 'UNIQUEMENT' : 'EXCLURE'}
-                      </button>
-                      <button type="button" className="btn-remove" onClick={() => removeCategory(cat.id)}>
-                        X
-                      </button>
-                    </div>
+                    {isOwner && (
+                      <div className="cat-actions">
+                        <button
+                          type="button"
+                          className={`btn-mode ${cat.mode}`}
+                          onClick={() => toggleMode(cat.id)}
+                        >
+                          {cat.mode === 'uniquement' ? 'UNIQUEMENT' : 'EXCLURE'}
+                        </button>
+                        <button type="button" className="btn-remove" onClick={() => removeCategory(cat.id)}>
+                          X
+                        </button>
+                      </div>
+                    )}
+                    {!isOwner && (
+                      <span className="cat-mode-label">{cat.mode === 'uniquement' ? 'UNIQUEMENT' : 'EXCLURE'}</span>
+                    )}
                   </div>
                 ))}
               </div>
 
-              <div className="add-category" ref={dropdownRef}>
-                <input
-                  type="text"
-                  value={categoryInput}
-                  onChange={(e) => setCategoryInput(e.target.value)}
-                  placeholder="Nouvelle catégorie..."
-                  onFocus={openDropdown}
-                  onClick={openDropdown}
-                  onKeyDown={(e) => e.key === 'Enter' && addCategory()}
-                />
-                <button type="button" onClick={addCategory}>+</button>
-                {dropdownOpen ? (
-                  <div className="category-suggestions">
-                    {availableCategories.length > 0 ? (
-                      availableCategories.map((name) => (
-                        <button
-                          key={name}
-                          type="button"
-                          className="category-suggestions__item"
-                          onMouseDown={(event) => event.preventDefault()}
-                          onClick={() => handleSuggestionClick(name)}
-                        >
-                          {name}
-                        </button>
-                      ))
-                    ) : (
-                      <div className="category-suggestions__empty">Aucune catégorie disponible</div>
-                    )}
-                  </div>
-                ) : null}
-              </div>
+              {isOwner && (
+                <div className="add-category" ref={dropdownRef}>
+                  <input
+                    type="text"
+                    value={categoryInput}
+                    onChange={(e) => setCategoryInput(e.target.value)}
+                    placeholder="Nouvelle catégorie..."
+                    onFocus={openDropdown}
+                    onClick={openDropdown}
+                    onKeyDown={(e) => e.key === 'Enter' && addCategory()}
+                  />
+                  <button type="button" onClick={addCategory}>+</button>
+                  {dropdownOpen ? (
+                    <div className="category-suggestions">
+                      {availableCategories.length > 0 ? (
+                        availableCategories.map((name) => (
+                          <button
+                            key={name}
+                            type="button"
+                            className="category-suggestions__item"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => handleSuggestionClick(name)}
+                          >
+                            {name}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="category-suggestions__empty">Aucune catégorie disponible</div>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              )}
             </div>
           )}
         </div>

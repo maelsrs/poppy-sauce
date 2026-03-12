@@ -1,4 +1,5 @@
 import asyncio
+import unicodedata
 from datetime import datetime, timezone
 from math import floor
 from typing import Dict, Optional
@@ -707,8 +708,13 @@ async def handle_submit_answer(sid, data=None):
     if not question:
         return
 
+    def _normalize(s: str) -> str:
+        s = unicodedata.normalize("NFD", s.lower()).encode("ascii", "ignore").decode()
+        s = s.replace("-", " ")
+        return " ".join(s.split())
+
     is_correct = any(
-        answer_text.lower() == valid.strip().lower()
+        _normalize(answer_text) == _normalize(valid.strip())
         for valid in question.answers
     )
 

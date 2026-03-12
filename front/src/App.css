@@ -219,6 +219,31 @@
   box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
 }
 
+.field--disabled .field__input {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.field--disabled .field__label {
+  opacity: 0.5;
+}
+
+.toggle-row--disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.category-item--disabled {
+  opacity: 0.6;
+}
+
+.cat-mode-label {
+  font-size: 0.7rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .account-card__actions {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));

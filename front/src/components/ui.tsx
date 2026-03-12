@@ -48,6 +48,7 @@ export type FieldProps = {
   onBlur?: (value: string) => void;
   placeholder?: string;
   name?: string;
+  disabled?: boolean;
 };
 
 export const Field = ({
@@ -58,8 +59,9 @@ export const Field = ({
   onBlur,
   placeholder,
   name,
+  disabled,
 }: FieldProps) => (
-  <label className="field">
+  <label className={`field ${disabled ? 'field--disabled' : ''}`}>
     <span className="field__label">{label}</span>
     <input
       className="field__input"
@@ -69,6 +71,7 @@ export const Field = ({
       onBlur={(e) => onBlur?.(e.target.value)}
       placeholder={placeholder}
       name={name}
+      disabled={disabled}
     />
   </label>
 );
