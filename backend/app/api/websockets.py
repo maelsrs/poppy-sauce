@@ -412,7 +412,10 @@ async def _end_game(room_code: str, *, winner_uuid: Optional[str] = None, reason
 async def connect(sid, environ, auth):
     from app.models.room import GameState, PlayerInfo, RoomDocument
 
-    qs = parse_qs(environ.get("QUERY_STRING", ""))
+    raw_qs = environ.get("query_string", b"")
+    if isinstance(raw_qs, bytes):
+        raw_qs = raw_qs.decode()
+    qs = parse_qs(raw_qs)
     room_code = (qs.get("room_code", [""])[0]).upper()
     player_uuid = qs.get("player_uuid", [""])[0]
     pseudo = qs.get("pseudo", [None])[0]
