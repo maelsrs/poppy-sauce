@@ -1262,6 +1262,10 @@
   gap: 0;
 }
 
+.game-answer-area--with-skip {
+  grid-template-columns: auto 1fr auto;
+}
+
 .game-answer-input {
   background: #0b0e14;
   border: 1px solid var(--lobby-border);
@@ -1289,6 +1293,31 @@
 
 .game-answer-btn:hover {
   background: #1d4ed8;
+}
+
+.game-skip-btn {
+  background: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+  border: 1px solid var(--lobby-border);
+  border-right: none;
+  padding: 14px 16px;
+  font-weight: 800;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: background 0.15s, color 0.15s;
+}
+
+.game-skip-btn:hover {
+  background: rgba(148, 163, 184, 0.2);
+  color: #cbd5e1;
+}
+
+.game-skip-btn.is-skipped {
+  background: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+  border-color: rgba(234, 179, 8, 0.3);
 }
 
 .game-timeup-msg,
@@ -1330,6 +1359,18 @@
 
 .player-row--correct .player-name {
   color: #4ade80;
+}
+
+/* Player row: skipped state */
+.player-row--skipped {
+  opacity: 0.4;
+}
+
+.player-row--skipped .player-name::after {
+  content: ' (skip)';
+  font-size: 0.7rem;
+  color: #94a3b8;
+  font-weight: 600;
 }
 
 .player-points {

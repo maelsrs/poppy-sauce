@@ -34,6 +34,7 @@ class GameManager:
         self.question_cache: Dict[int, object] = {}
         self.last_ping_persist: Dict[str, float] = {}
         self.pending_leave: Dict[str, asyncio.Task] = {}
+        self.skipped_players: Dict[str, set] = {}
 
     def register(self, sid: str, room_code: str, player_uuid: str):
         self.sid_map[sid] = (room_code, player_uuid)
@@ -223,6 +224,8 @@ async def _send_next_question(room_code: str):
         room.game_data.used_question_ids.append(q_id)
     await room.save()
 
+    manager.skipped_players.pop(room_code, None)
+
     await sio.emit("new_question", {
         "question_index": room.game_data.current_question_index,
         "total_questions": len(room.game_data.question_ids),
@@ -291,8 +294,10 @@ async def _check_all_answered(room_code: str):
         correct_uuids = {
             ap.player_uuid for ap in room.game_data.answered_players if ap.is_correct
         }
+        skipped_uuids = manager.skipped_players.get(room_code, set())
+        done_uuids = correct_uuids | skipped_uuids
 
-        if connected_uuids and connected_uuids.issubset(correct_uuids):
+        if connected_uuids and connected_uuids.issubset(done_uuids):
             manager.cancel_timer(room_code)
 
             correct_answer = None
@@ -693,6 +698,12 @@ async def handle_submit_answer(sid, data=None):
     if not answer_text:
         return
 
+    skipped_set = manager.skipped_players.get(room_code, set())
+    was_skipped = player_uuid in skipped_set
+    if was_skipped:
+        skipped_set.discard(player_uuid)
+        await sio.emit("player_unskipped", {"player_uuid": player_uuid}, room=room_code)
+
     already_correct = any(
         ap.player_uuid == player_uuid and ap.is_correct
         for ap in room.game_data.answered_players
@@ -889,3 +900,53 @@ async def handle_update_config(sid, data=None):
             "timestamp": _now_ms(),
             "system": True,
         }, room=room_code)
+
+
+@sio.on("skip_question")
+async def handle_skip_question(sid, data=None):
+    from app.models.room import GameState, RoomDocument
+
+    info = manager.sid_map.get(sid)
+    if not info:
+        return
+    room_code, player_uuid = info
+
+    room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
+    if not room or room.game_state != GameState.PLAYING:
+        return
+
+    already_correct = any(
+        ap.player_uuid == player_uuid and ap.is_correct
+        for ap in room.game_data.answered_players
+    )
+    if already_correct:
+        return
+
+    skipped_set = manager.skipped_players.setdefault(room_code, set())
+    if player_uuid in skipped_set:
+        return
+
+    skipped_set.add(player_uuid)
+
+    await sio.emit("player_skipped", {"player_uuid": player_uuid}, room=room_code)
+
+    connected_uuids = {p.player_uuid for p in room.players_info if p.is_connected}
+    correct_uuids = {
+        ap.player_uuid for ap in room.game_data.answered_players if ap.is_correct
+    }
+    done_uuids = correct_uuids | skipped_set
+
+    if connected_uuids and connected_uuids.issubset(done_uuids):
+        manager.cancel_timer(room_code)
+
+        correct_answer = None
+        if room.game_data.question_ids:
+            idx = room.game_data.current_question_index
+            if idx < len(room.game_data.question_ids):
+                q = await _fetch_question(room.game_data.question_ids[idx])
+                if q and q.answers:
+                    correct_answer = q.answers[0]
+
+        await sio.emit("all_answered", {"correct_answer": correct_answer}, room=room_code)
+        await asyncio.sleep(DELAY_AFTER_ALL_ANSWERED)
+        await _advance_question(room_code)

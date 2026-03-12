@@ -133,6 +133,7 @@ function LobbyPage() {
   const [correctAnswer, setCorrectAnswer] = useState<string | null>(null);
   const [lastWrongAnswer, setLastWrongAnswer] = useState<Record<string, string>>({});
   const [correctPlayerUuids, setCorrectPlayerUuids] = useState<Set<string>>(new Set());
+  const [skippedPlayerUuids, setSkippedPlayerUuids] = useState<Set<string>>(new Set());
   const [currentRound, setCurrentRound] = useState(1);
   const [roundWins, setRoundWins] = useState<Record<string, number>>({});
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -217,6 +218,17 @@ function LobbyPage() {
       setTimeout(() => answerInputRef.current?.focus(), 100);
     }
   }, [currentQuestion, hasAnsweredCorrectly, timeUp]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.shiftKey && e.key === 'Delete' && gameState === 'PLAYING') {
+        e.preventDefault();
+        handleSkip();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  });
 
   useEffect(() => {
     if (authLoading) return;
@@ -317,6 +329,7 @@ function LobbyPage() {
       setRoundWins({});
       setCurrentRound(1);
       setCorrectPlayerUuids(new Set());
+      setSkippedPlayerUuids(new Set());
       setLastWrongAnswer({});
       setHasAnsweredCorrectly(false);
       setTimeUp(false);
@@ -342,6 +355,7 @@ function LobbyPage() {
       setCorrectAnswer(null);
       setLastWrongAnswer({});
       setCorrectPlayerUuids(new Set());
+      setSkippedPlayerUuids(new Set());
       setRoundWonInfo(null);
     });
 
@@ -364,6 +378,18 @@ function LobbyPage() {
 
     socket.on('all_answered', (msg) => {
       setCorrectAnswer(msg.correct_answer ?? null);
+    });
+
+    socket.on('player_skipped', (msg) => {
+      setSkippedPlayerUuids((prev) => new Set(prev).add(msg.player_uuid));
+    });
+
+    socket.on('player_unskipped', (msg) => {
+      setSkippedPlayerUuids((prev) => {
+        const next = new Set(prev);
+        next.delete(msg.player_uuid);
+        return next;
+      });
     });
 
     socket.on('time_up', (msg) => {
@@ -392,6 +418,7 @@ function LobbyPage() {
       setRoundWins({});
       setCurrentRound(1);
       setCorrectPlayerUuids(new Set());
+      setSkippedPlayerUuids(new Set());
       setLastWrongAnswer({});
       setHasAnsweredCorrectly(false);
       setTimeUp(false);
@@ -550,6 +577,12 @@ function LobbyPage() {
     setMyAnswer('');
   };
 
+  const handleSkip = () => {
+    if (hasAnsweredCorrectly || timeUp) return;
+    if (skippedPlayerUuids.has(playerUuid)) return;
+    sendWsMessage('skip_question');
+  };
+
   const handleSendChat = () => {
     const text = chatInput.trim();
     if (!text) return;
@@ -634,7 +667,15 @@ function LobbyPage() {
           Bonne réponse !{correctAnswer ? <> C'était : <strong>{correctAnswer}</strong></> : ' En attente des autres...'}
         </div>
       ) : (
-        <div className="game-answer-area">
+        <div className="game-answer-area game-answer-area--with-skip">
+          <button
+            type="button"
+            className={`game-skip-btn ${skippedPlayerUuids.has(playerUuid) ? 'is-skipped' : ''}`}
+            onClick={handleSkip}
+            title="Skip (Shift+Suppr)"
+          >
+            SKIP
+          </button>
           <input
             ref={answerInputRef}
             type="text"
@@ -642,7 +683,7 @@ function LobbyPage() {
             value={myAnswer}
             onChange={(e) => setMyAnswer(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSubmitAnswer()}
-            placeholder="Tapez votre réponse..."
+            placeholder={skippedPlayerUuids.has(playerUuid) ? 'Répondre pour annuler le skip...' : 'Tapez votre réponse...'}
             autoComplete="off"
           />
           <button type="button" className="game-answer-btn" onClick={handleSubmitAnswer}>
@@ -766,11 +807,12 @@ function LobbyPage() {
       <div className="players-grid">
         {sortedPlayers.map((player) => {
           const isCorrect = correctPlayerUuids.has(player.player_uuid);
+          const isSkipped = skippedPlayerUuids.has(player.player_uuid);
           const wrongAnswer = lastWrongAnswer[player.player_uuid];
           return (
             <div
               key={player.player_uuid}
-              className={`player-row ${isCorrect && gameState === 'PLAYING' ? 'player-row--correct' : ''} ${selectedPlayer?.player_uuid === player.player_uuid ? 'player-row--selected' : ''}`}
+              className={`player-row ${isCorrect && gameState === 'PLAYING' ? 'player-row--correct' : ''} ${isSkipped && gameState === 'PLAYING' ? 'player-row--skipped' : ''} ${selectedPlayer?.player_uuid === player.player_uuid ? 'player-row--selected' : ''}`}
               onClick={() => handlePlayerClick(player)}
               style={{ cursor: 'pointer' }}
             >
