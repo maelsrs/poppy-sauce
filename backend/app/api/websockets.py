@@ -124,6 +124,7 @@ def _config_dict(configurations) -> dict:
         "question_duration": configurations.question_duration,
         "rounds_to_win": configurations.rounds_to_win,
         "show_answers": configurations.show_answers,
+        "categories": [{"name": c.name, "mode": c.mode} for c in configurations.categories],
     }
 
 
@@ -138,12 +139,35 @@ async def _fetch_question(question_id: int):
     return q
 
 
-async def _fetch_question_batch(exclude_ids: list[int], size: int = QUESTION_BATCH_SIZE) -> list[int]:
+def _build_category_filter(categories: list) -> dict | None:
+    if not categories:
+        return None
+    include = [c.name for c in categories if c.mode == "uniquement"]
+    exclude = [c.name for c in categories if c.mode == "enlever"]
+    match: dict = {}
+    if include:
+        match["category"] = {"$in": include}
+    if exclude:
+        if "category" in match:
+            match["category"]["$nin"] = exclude
+        else:
+            match["category"] = {"$nin": exclude}
+    return match if match else None
+
+
+async def _fetch_question_batch(exclude_ids: list[int], size: int = QUESTION_BATCH_SIZE, categories: list | None = None) -> list[int]:
     from app.models.question import QuestionDocument
 
+    cat_filter = _build_category_filter(categories) if categories else None
+
     pipeline: list[dict] = []
+    match_stage: dict = {}
     if exclude_ids:
-        pipeline.append({"$match": {"question_id": {"$nin": exclude_ids}}})
+        match_stage["question_id"] = {"$nin": exclude_ids}
+    if cat_filter:
+        match_stage.update(cat_filter)
+    if match_stage:
+        pipeline.append({"$match": match_stage})
     pipeline.append({"$sample": {"size": size}})
     pipeline.append({"$project": {"question_id": 1, "_id": 0}})
 
@@ -151,10 +175,11 @@ async def _fetch_question_batch(exclude_ids: list[int], size: int = QUESTION_BAT
     ids = [doc["question_id"] async for doc in cursor]
 
     if not ids and exclude_ids:
-        pipeline_all = [
-            {"$sample": {"size": size}},
-            {"$project": {"question_id": 1, "_id": 0}},
-        ]
+        pipeline_all: list[dict] = []
+        if cat_filter:
+            pipeline_all.append({"$match": cat_filter})
+        pipeline_all.append({"$sample": {"size": size}})
+        pipeline_all.append({"$project": {"question_id": 1, "_id": 0}})
         cursor_all = QuestionDocument.get_pymongo_collection().aggregate(pipeline_all)
         ids = [doc["question_id"] async for doc in cursor_all]
 
@@ -169,12 +194,13 @@ async def _send_next_question(room_code: str):
         return
 
     if room.game_data.current_question_index >= len(room.game_data.question_ids):
+        cats = room.configurations.categories or None
         new_ids = await _fetch_question_batch(
-            exclude_ids=room.game_data.used_question_ids, size=QUESTION_BATCH_SIZE
+            exclude_ids=room.game_data.used_question_ids, size=QUESTION_BATCH_SIZE, categories=cats
         )
         if not new_ids:
             room.game_data.used_question_ids = []
-            new_ids = await _fetch_question_batch(exclude_ids=[], size=QUESTION_BATCH_SIZE)
+            new_ids = await _fetch_question_batch(exclude_ids=[], size=QUESTION_BATCH_SIZE, categories=cats)
         if not new_ids:
             await _end_game(room_code, reason="no_more_questions")
             return
@@ -615,10 +641,11 @@ async def handle_start_game(sid, data=None):
     if not player or not player.is_owner or room.game_state != GameState.WAITING:
         return
 
-    q_ids = await _fetch_question_batch(exclude_ids=[], size=QUESTION_BATCH_SIZE)
+    cats = room.configurations.categories or None
+    q_ids = await _fetch_question_batch(exclude_ids=[], size=QUESTION_BATCH_SIZE, categories=cats)
     if not q_ids:
         await sio.emit("error", {
-            "message": "Aucune question disponible en base de données.",
+            "message": "Aucune question disponible pour ces catégories.",
         }, to=sid)
         return
 
@@ -814,6 +841,12 @@ async def handle_update_config(sid, data=None):
         room.configurations.rounds_to_win = max(1, int(data["rounds_to_win"]))
     if "show_answers" in data:
         room.configurations.show_answers = bool(data["show_answers"])
+    if "categories" in data:
+        from app.models.room import CategoryConfig
+        room.configurations.categories = [
+            CategoryConfig(name=c["name"], mode=c.get("mode", "uniquement"))
+            for c in data["categories"] if isinstance(c, dict) and c.get("name")
+        ]
     await room.save()
 
     new = _config_dict(room.configurations)
@@ -824,6 +857,19 @@ async def handle_update_config(sid, data=None):
             if key == "question_duration":
                 val += "s"
             changes.append(f"{labels[key]} → {val}")
+
+    old_cats = {c["name"] for c in old["categories"]}
+    new_cats = {c["name"] for c in new["categories"]}
+    added = new_cats - old_cats
+    removed = old_cats - new_cats
+    if added:
+        changes.append(f"Catégories ajoutées : {', '.join(sorted(added))}")
+    if removed:
+        changes.append(f"Catégories retirées : {', '.join(sorted(removed))}")
+    for c in new["categories"]:
+        old_c = next((o for o in old["categories"] if o["name"] == c["name"]), None)
+        if old_c and old_c["mode"] != c["mode"]:
+            changes.append(f"{c['name']} → {c['mode'].upper()}")
 
     await sio.emit("config_update", {
         "configurations": new,
