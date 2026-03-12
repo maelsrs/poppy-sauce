@@ -32,6 +32,7 @@ class GameManager:
         self.uuid_to_sid: Dict[str, Dict[str, str]] = {}
         self.question_cache: Dict[int, object] = {}
         self.last_ping_persist: Dict[str, float] = {}
+        self.pending_leave: Dict[str, asyncio.Task] = {}
 
     def register(self, sid: str, room_code: str, player_uuid: str):
         self.sid_map[sid] = (room_code, player_uuid)
@@ -438,8 +439,14 @@ async def _handle_connect(sid, environ):
     if old_sid and old_sid != sid:
         await sio.disconnect(old_sid)
 
+    leave_key = f"{room_code}:{player_uuid}"
+    leave_task = manager.pending_leave.pop(leave_key, None)
+    if leave_task and not leave_task.done():
+        leave_task.cancel()
+
     now_ms = _now_ms()
     existing = room.find_player(player_uuid)
+    is_new = not existing
     if existing:
         await room.mark_player_connected(player_uuid=player_uuid, now_ms=now_ms)
     else:
@@ -509,6 +516,15 @@ async def _handle_connect(sid, environ):
             "player": _player_dict(player_info),
         }, room=room_code, skip_sid=sid)
 
+        if is_new:
+            await sio.emit("chat_message", {
+                "player_uuid": None,
+                "pseudo": None,
+                "text": f"{player_info.pseudo or 'Un joueur'} a rejoint la partie",
+                "timestamp": _now_ms(),
+                "system": True,
+            }, room=room_code)
+
 
 @sio.event
 async def disconnect(sid):
@@ -526,11 +542,37 @@ async def disconnect(sid):
         if room.game_state == GameState.PLAYING:
             await manager.flush_playtime(room_code, player_uuid)
 
+        player = room.find_player(player_uuid)
+        pseudo = player.pseudo if player else None
+
         await room.mark_player_disconnected(player_uuid=player_uuid, now_ms=_now_ms())
 
         await sio.emit("player_leave", {
             "player_uuid": player_uuid,
         }, room=room_code)
+
+        async def _delayed_leave_msg():
+            await asyncio.sleep(5)
+            from app.models.room import RoomDocument as RD
+            r = await RD.find_one(RD.room_code == room_code)
+            if not r:
+                return
+            p = r.find_player(player_uuid)
+            if p and p.is_connected:
+                return
+            await sio.emit("chat_message", {
+                "player_uuid": None,
+                "pseudo": None,
+                "text": f"{pseudo or 'Un joueur'} a quitté la partie",
+                "timestamp": _now_ms(),
+                "system": True,
+            }, room=room_code)
+
+        leave_key = f"{room_code}:{player_uuid}"
+        old_task = manager.pending_leave.pop(leave_key, None)
+        if old_task and not old_task.done():
+            old_task.cancel()
+        manager.pending_leave[leave_key] = asyncio.create_task(_delayed_leave_msg())
 
         await room.close_if_empty()
 
@@ -756,6 +798,14 @@ async def handle_update_config(sid, data=None):
     if not player or not player.is_owner:
         return
 
+    labels = {
+        "score_objective": "Score objectif",
+        "question_duration": "Durée des questions",
+        "rounds_to_win": "Manches pour gagner",
+        "show_answers": "Afficher les réponses",
+    }
+    old = _config_dict(room.configurations)
+
     if "score_objective" in data:
         room.configurations.score_objective = max(1, int(data["score_objective"]))
     if "question_duration" in data:
@@ -766,6 +816,24 @@ async def handle_update_config(sid, data=None):
         room.configurations.show_answers = bool(data["show_answers"])
     await room.save()
 
+    new = _config_dict(room.configurations)
+    changes = []
+    for key in labels:
+        if old[key] != new[key]:
+            val = "Oui" if new[key] is True else "Non" if new[key] is False else f"{new[key]}"
+            if key == "question_duration":
+                val += "s"
+            changes.append(f"{labels[key]} → {val}")
+
     await sio.emit("config_update", {
-        "configurations": _config_dict(room.configurations),
+        "configurations": new,
     }, room=room_code)
+
+    if changes:
+        await sio.emit("chat_message", {
+            "player_uuid": None,
+            "pseudo": None,
+            "text": "Paramètres modifiés : " + ", ".join(changes),
+            "timestamp": _now_ms(),
+            "system": True,
+        }, room=room_code)

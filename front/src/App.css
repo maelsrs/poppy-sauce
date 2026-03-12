@@ -1651,6 +1651,16 @@
   color: var(--lobby-text);
 }
 
+.chat-msg--system {
+  justify-content: center;
+}
+
+.chat-msg--system .chat-msg__text {
+  color: #888;
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
 .chat-input-area {
   display: grid;
   grid-template-columns: 1fr 36px;

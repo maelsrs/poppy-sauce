@@ -34,10 +34,11 @@ type CurrentQuestion = {
 
 
 type ChatMessage = {
-  player_uuid: string;
+  player_uuid: string | null;
   pseudo: string;
   text: string;
   timestamp: number;
+  system?: boolean;
 };
 
 type LeaderboardEntry = {
@@ -426,10 +427,11 @@ function LobbyPage() {
 
     socket.on('chat_message', (msg) => {
       setChatMessages((prev) => [...prev.slice(-99), {
-        player_uuid: msg.player_uuid,
+        player_uuid: msg.player_uuid ?? null,
         pseudo: msg.pseudo ?? 'Anonyme',
         text: msg.text,
         timestamp: msg.timestamp,
+        system: msg.system ?? false,
       }]);
     });
 
@@ -993,10 +995,16 @@ function LobbyPage() {
           </div>
           <div className="chat-messages">
             {chatMessages.map((msg, i) => (
-              <div key={i} className={`chat-msg ${msg.player_uuid === playerUuid ? 'chat-msg--me' : ''}`}>
-                <span className="chat-msg__pseudo">{msg.pseudo}</span>
-                <span className="chat-msg__text">{msg.text}</span>
-              </div>
+              msg.system ? (
+                <div key={i} className="chat-msg chat-msg--system">
+                  <span className="chat-msg__text">{msg.text}</span>
+                </div>
+              ) : (
+                <div key={i} className={`chat-msg ${msg.player_uuid === playerUuid ? 'chat-msg--me' : ''}`}>
+                  <span className="chat-msg__pseudo">{msg.pseudo}</span>
+                  <span className="chat-msg__text">{msg.text}</span>
+                </div>
+              )
             ))}
             <div ref={chatEndRef} />
           </div>

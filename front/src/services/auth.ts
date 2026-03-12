@@ -31,7 +31,7 @@ const translateDetail = (text: string): string => {
   }
 
   if (lower.includes('ensure this value has at least') || lower.includes('champ trop court') || lower.includes('trop court')) {
-    return 'Le mot de passe doit contenir au moins 8 caractères.';
+    return text;
   }
 
   if (lower.includes('field required') || lower.includes('champ requis')) {
