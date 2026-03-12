@@ -1,5 +1,6 @@
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import './App.css';
+import AdminPage from './pages/Admin';
 import HomePage from './pages/Home';
 import PublicGamesPage from './pages/PublicGames';
 import AuthPage from './pages/Auth';
@@ -34,6 +35,7 @@ function App() {
           <Route path="/lobby" element={<LobbyPage />} />
           <Route path="/game/:code" element={<LobbyPage />} />
           <Route path="/public-games" element={<PublicGamesPage />} />
+          <Route path="/admin" element={<AdminPage />} />
           <Route path="*" element={<div className="not-found">Page introuvable</div>} />
         </Routes>
       </main>

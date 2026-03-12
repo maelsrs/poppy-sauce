@@ -6,6 +6,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.api.routes.admin import router as admin_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.health import router as health_router
 from app.api.routes.rooms import router as rooms_router
@@ -73,5 +74,6 @@ fastapi_app.include_router(health_router)
 fastapi_app.include_router(auth_router)
 fastapi_app.include_router(rooms_router)
 fastapi_app.include_router(users_router)
+fastapi_app.include_router(admin_router)
 
 app = socketio_lib.ASGIApp(sio, other_asgi_app=fastapi_app)

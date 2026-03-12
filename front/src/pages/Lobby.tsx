@@ -122,6 +122,7 @@ function LobbyPage() {
   const [playerUuid, setPlayerUuid] = useState<string>('');
   const [gameState, setGameState] = useState<'WAITING' | 'PLAYING' | 'FINISHED'>('WAITING');
   const [wsReady, setWsReady] = useState(false);
+  const [roomNotFound, setRoomNotFound] = useState(false);
 
   // Game state
   const [currentQuestion, setCurrentQuestion] = useState<CurrentQuestion | null>(null);
@@ -456,7 +457,7 @@ function LobbyPage() {
 
     socket.on('connect_error', (err) => {
       if (err.message === 'Room introuvable') {
-        navigate('/public-games');
+        setRoomNotFound(true);
       }
     });
 
@@ -830,6 +831,29 @@ function LobbyPage() {
                 disabled={pseudoDraft.trim().length < 2}
               >
                 REJOINDRE
+              </button>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (roomNotFound) {
+    return (
+      <div className="lobby-shell is-config-closed">
+        <main className="lobby-stage">
+          <div className="stage-content">
+            <div className="placeholder-box">
+              <h2>Cette partie n'existe pas</h2>
+              <p>Le code <strong>{roomCode}</strong> ne correspond à aucune partie en cours.</p>
+              <button
+                type="button"
+                className="btn-join"
+                style={{ marginTop: 16 }}
+                onClick={() => navigate('/')}
+              >
+                RETOUR À L'ACCUEIL
               </button>
             </div>
           </div>
