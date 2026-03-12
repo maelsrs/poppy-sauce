@@ -163,9 +163,9 @@ async def _fetch_question_batch(exclude_ids: list[int], size: int = QUESTION_BAT
     cat_filter = _build_category_filter(categories) if categories else None
 
     pipeline: list[dict] = []
-    match_stage: dict = {}
+    match_stage: dict = {"question_id": {"$exists": True, "$ne": None}}
     if exclude_ids:
-        match_stage["question_id"] = {"$nin": exclude_ids}
+        match_stage["question_id"]["$nin"] = exclude_ids
     if cat_filter:
         match_stage.update(cat_filter)
     if match_stage:

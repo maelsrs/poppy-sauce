@@ -2,7 +2,7 @@ from enum import Enum
 from typing import List, Optional
 
 from beanie import Document, Insert, before_event
-from pydantic import Field, HttpUrl
+from pydantic import Field
 from pymongo import ReturnDocument
 
 
@@ -18,7 +18,7 @@ class QuestionDocument(Document):
     category: str = Field(default="Grand public", index=True)
     question: str = Field(...,)
     answers: List[str] = Field(default_factory=list,)
-    image_url: Optional[HttpUrl] = Field(default=None)
+    image_url: Optional[str] = Field(default=None)
 
     class Settings:
         name = "questions"
