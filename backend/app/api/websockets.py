@@ -1,4 +1,5 @@
 import asyncio
+import re
 import unicodedata
 from datetime import datetime, timezone
 from math import floor
@@ -35,6 +36,7 @@ class GameManager:
         self.last_ping_persist: Dict[str, float] = {}
         self.pending_leave: Dict[str, asyncio.Task] = {}
         self.skipped_players: Dict[str, set] = {}
+        self.pending_round_win: Dict[str, dict] = {}
 
     def register(self, sid: str, room_code: str, player_uuid: str):
         self.sid_map[sid] = (room_code, player_uuid)
@@ -270,6 +272,34 @@ async def _question_timer(room_code: str, duration: int):
 async def _advance_question(room_code: str):
     from app.models.room import GameState, RoomDocument
 
+    pending = manager.pending_round_win.pop(room_code, None)
+    if pending:
+        room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
+        if not room or room.game_state != GameState.PLAYING:
+            return
+
+        if pending["wins"] >= room.configurations.rounds_to_win:
+            await _end_game(room_code, winner_uuid=pending["player_uuid"])
+            return
+
+        await asyncio.sleep(DELAY_AFTER_ROUND_WON)
+
+        room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
+        if not room or room.game_state != GameState.PLAYING:
+            return
+        room.game_data.actual_round += 1
+        for p in room.players_info:
+            p.points = 0
+        room.game_data.first_correct_at = None
+        room.game_data.answered_players = []
+        room.game_data.used_question_ids = []
+        room.game_data.question_ids = []
+        room.game_data.current_question_index = 0
+        await room.save()
+
+        await _send_next_question(room_code)
+        return
+
     room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
     if not room or room.game_state != GameState.PLAYING:
         return
@@ -335,8 +365,6 @@ async def _check_round_end(room_code: str, player_uuid: str):
             asyncio.create_task(_check_all_answered(room_code))
             return
 
-        manager.cancel_timer(room_code)
-
         wins = room.game_data.round_wins.get(player_uuid, 0) + 1
         room.game_data.round_wins[player_uuid] = wins
         await room.save()
@@ -348,25 +376,12 @@ async def _check_round_end(room_code: str, player_uuid: str):
             "round_wins": room.game_data.round_wins,
         }, room=room_code)
 
-        if wins >= room.configurations.rounds_to_win:
-            await _end_game(room_code, winner_uuid=player_uuid)
-            return
+        manager.pending_round_win[room_code] = {
+            "player_uuid": player_uuid,
+            "wins": wins,
+        }
 
-        room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
-        if not room:
-            return
-        room.game_data.actual_round += 1
-        for p in room.players_info:
-            p.points = 0
-        room.game_data.first_correct_at = None
-        room.game_data.answered_players = []
-        room.game_data.used_question_ids = []
-        room.game_data.question_ids = []
-        room.game_data.current_question_index = 0
-        await room.save()
-
-        await asyncio.sleep(DELAY_AFTER_ROUND_WON)
-        await _send_next_question(room_code)
+        asyncio.create_task(_check_all_answered(room_code))
     except asyncio.CancelledError:
         pass
     except Exception as e:
@@ -721,7 +736,7 @@ async def handle_submit_answer(sid, data=None):
 
     def _normalize(s: str) -> str:
         s = unicodedata.normalize("NFD", s.lower()).encode("ascii", "ignore").decode()
-        s = s.replace("-", " ")
+        s = re.sub(r"[,;:.!?'\"\-()\\[\\]{}]", " ", s)
         return " ".join(s.split())
 
     is_correct = any(
@@ -950,3 +965,24 @@ async def handle_skip_question(sid, data=None):
         await sio.emit("all_answered", {"correct_answer": correct_answer}, room=room_code)
         await asyncio.sleep(DELAY_AFTER_ALL_ANSWERED)
         await _advance_question(room_code)
+
+
+@sio.on("unskip_question")
+async def handle_unskip_question(sid, data=None):
+    from app.models.room import GameState, RoomDocument
+
+    info = manager.sid_map.get(sid)
+    if not info:
+        return
+    room_code, player_uuid = info
+
+    room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
+    if not room or room.game_state != GameState.PLAYING:
+        return
+
+    skipped_set = manager.skipped_players.get(room_code, set())
+    if player_uuid not in skipped_set:
+        return
+
+    skipped_set.discard(player_uuid)
+    await sio.emit("player_unskipped", {"player_uuid": player_uuid}, room=room_code)

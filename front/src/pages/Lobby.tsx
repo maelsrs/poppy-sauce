@@ -351,7 +351,12 @@ function LobbyPage() {
         total_questions: msg.total_questions,
       });
       setTimeLeft(msg.time_limit);
-      setCurrentRound(msg.round);
+      setCurrentRound((prev) => {
+        if (msg.round !== prev) {
+          setPlayers((ps) => ps.map((p) => ({ ...p, points: 0 })));
+        }
+        return msg.round;
+      });
       setMyAnswer('');
       setHasAnsweredCorrectly(false);
       setTimeUp(false);
@@ -406,7 +411,6 @@ function LobbyPage() {
     socket.on('round_won', (msg) => {
       setRoundWins(msg.round_wins ?? {});
       setRoundWonInfo({ pseudo: msg.pseudo, round: msg.round });
-      setPlayers((prev) => prev.map((p) => ({ ...p, points: 0 })));
     });
 
     socket.on('game_finished', (msg) => {
@@ -578,7 +582,13 @@ function LobbyPage() {
   };
 
   const handleSubmitAnswer = () => {
-    if (!myAnswer.trim() || hasAnsweredCorrectly || timeUp) return;
+    if (hasAnsweredCorrectly || timeUp) return;
+    if (!myAnswer.trim()) {
+      if (skippedPlayerUuids.has(playerUuid)) {
+        sendWsMessage('unskip_question');
+      }
+      return;
+    }
     sendWsMessage('submit_answer', { answer: myAnswer.trim() });
     setMyAnswer('');
   };
