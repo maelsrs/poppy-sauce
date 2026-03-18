@@ -133,6 +133,7 @@ function LobbyPage() {
   const [timeUp, setTimeUp] = useState(false);
   const [correctAnswer, setCorrectAnswer] = useState<string | null>(null);
   const [lastWrongAnswer, setLastWrongAnswer] = useState<Record<string, string>>({});
+  const [correctPlayersAnswers, setCorrectPlayersAnswers] = useState<Record<string, string>>({});
   const [correctPlayerUuids, setCorrectPlayerUuids] = useState<Set<string>>(new Set());
   const [skippedPlayerUuids, setSkippedPlayerUuids] = useState<Set<string>>(new Set());
   const [allAnswered, setAllAnswered] = useState(false);
@@ -200,7 +201,7 @@ function LobbyPage() {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    if (currentQuestion && timeLeft > 0 && !timeUp) {
+    if (currentQuestion && timeLeft > 0 && !timeUp && !allAnswered) {
       timerRef.current = window.setInterval(() => {
         setTimeLeft((prev) => {
           if (prev <= 1) {
@@ -214,7 +215,7 @@ function LobbyPage() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [currentQuestion, timeUp]);
+  }, [currentQuestion, timeUp, allAnswered]);
 
   useEffect(() => {
     if (currentQuestion && !hasAnsweredCorrectly && !timeUp) {
@@ -315,6 +316,7 @@ function LobbyPage() {
         setCorrectAnswer(null);
         setMyAnswer('');
         setLastWrongAnswer({});
+        setCorrectPlayersAnswers({});
         if (msg.answered_players) {
           const correctSet = new Set<string>();
           for (const ap of msg.answered_players) {
@@ -337,6 +339,7 @@ function LobbyPage() {
       setCorrectPlayerUuids(new Set());
       setSkippedPlayerUuids(new Set());
       setLastWrongAnswer({});
+      setCorrectPlayersAnswers({});
       setHasAnsweredCorrectly(false);
       setTimeUp(false);
       setAllAnswered(false);
@@ -365,6 +368,7 @@ function LobbyPage() {
       setFirstPseudo(null);
       setCorrectAnswer(null);
       setLastWrongAnswer({});
+      setCorrectPlayersAnswers({});
       setCorrectPlayerUuids(new Set());
       setSkippedPlayerUuids(new Set());
       setRoundWonInfo(null);
@@ -391,6 +395,9 @@ function LobbyPage() {
       setCorrectAnswer(msg.correct_answer ?? null);
       setFirstPseudo(msg.first_pseudo ?? null);
       setAllAnswered(true);
+      const map: Record<string, string> = {};
+      for (const cp of msg.correct_players ?? []) map[cp.player_uuid] = cp.answer;
+      setCorrectPlayersAnswers(map);
     });
 
     socket.on('player_skipped', (msg) => {
@@ -410,6 +417,9 @@ function LobbyPage() {
       setTimeLeft(0);
       setCorrectAnswer(msg.correct_answer ?? null);
       setFirstPseudo(msg.first_pseudo ?? null);
+      const map: Record<string, string> = {};
+      for (const cp of msg.correct_players ?? []) map[cp.player_uuid] = cp.answer;
+      setCorrectPlayersAnswers(map);
     });
 
     socket.on('round_won', (msg) => {
@@ -434,6 +444,7 @@ function LobbyPage() {
       setCorrectPlayerUuids(new Set());
       setSkippedPlayerUuids(new Set());
       setLastWrongAnswer({});
+      setCorrectPlayersAnswers({});
       setHasAnsweredCorrectly(false);
       setTimeUp(false);
       setAllAnswered(false);
@@ -588,7 +599,7 @@ function LobbyPage() {
   };
 
   const handleSubmitAnswer = () => {
-    if (!myAnswer.trim() || hasAnsweredCorrectly || timeUp) return;
+    if (!myAnswer.trim() || hasAnsweredCorrectly || timeUp || allAnswered) return;
     sendWsMessage('submit_answer', { answer: myAnswer.trim() });
     setMyAnswer('');
   };
@@ -838,6 +849,7 @@ function LobbyPage() {
           const isCorrect = correctPlayerUuids.has(player.player_uuid);
           const isSkipped = skippedPlayerUuids.has(player.player_uuid);
           const wrongAnswer = lastWrongAnswer[player.player_uuid];
+          const correctAnswerText = correctPlayersAnswers[player.player_uuid];
           return (
             <div
               key={player.player_uuid}
@@ -856,6 +868,9 @@ function LobbyPage() {
                     <span className="round-wins-badge">{roundWins[player.player_uuid]}R</span>
                   )}
                 </div>
+                {gameState === 'PLAYING' && (timeUp || allAnswered) && correctAnswerText && (
+                  <span className="player-correct-answer">&#x2714; {truncate(correctAnswerText, 25)}</span>
+                )}
                 {gameState === 'PLAYING' && wrongAnswer && !isCorrect && (
                   <span className="player-wrong-answer">&#x2716; {truncate(wrongAnswer, 25)}</span>
                 )}

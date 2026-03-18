@@ -139,6 +139,23 @@ def _get_first_correct_pseudo(room) -> str | None:
     return player.pseudo if player else None
 
 
+def _get_correct_answers_list(room) -> list[dict]:
+    result = []
+    for ap in room.game_data.answered_players:
+        if not ap.is_correct:
+            continue
+        player = room.find_player(ap.player_uuid)
+        result.append({
+            "player_uuid": ap.player_uuid,
+            "pseudo": player.pseudo if player else "?",
+            "answer": ap.answer,
+        })
+    result.sort(key=lambda x: next(
+        (a.answered_at for a in room.game_data.answered_players if a.player_uuid == x["player_uuid"]), 0
+    ))
+    return result
+
+
 async def _fetch_question(question_id: int):
     cached = manager.question_cache.get(question_id)
     if cached:
@@ -272,6 +289,7 @@ async def _question_timer(room_code: str, duration: int):
         await sio.emit("time_up", {
             "correct_answer": correct_answer,
             "first_pseudo": first_pseudo,
+            "correct_players": _get_correct_answers_list(room) if room else [],
         }, room=room_code)
         await asyncio.sleep(DELAY_AFTER_TIME_UP)
         await _advance_question(room_code)
@@ -325,6 +343,7 @@ async def _check_all_answered(room_code: str):
             await sio.emit("all_answered", {
                 "correct_answer": correct_answer,
                 "first_pseudo": _get_first_correct_pseudo(room),
+                "correct_players": _get_correct_answers_list(room),
             }, room=room_code)
             await asyncio.sleep(DELAY_AFTER_ALL_ANSWERED)
             await _advance_question(room_code)
@@ -966,6 +985,7 @@ async def handle_skip_question(sid, data=None):
         await sio.emit("all_answered", {
             "correct_answer": correct_answer,
             "first_pseudo": _get_first_correct_pseudo(room),
+            "correct_players": _get_correct_answers_list(room),
         }, room=room_code)
         await asyncio.sleep(DELAY_AFTER_ALL_ANSWERED)
         await _advance_question(room_code)

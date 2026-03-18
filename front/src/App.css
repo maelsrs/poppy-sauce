@@ -1009,6 +1009,19 @@
   gap: 6px;
 }
 
+.player-correct-answer {
+  font-size: 0.7rem;
+  color: #4ade80;
+  opacity: 0.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  background: rgba(74, 222, 128, 0.08);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
 .player-wrong-answer {
   font-size: 0.7rem;
   color: #f87171;
@@ -1264,6 +1277,7 @@
   font-weight: 700;
   color: #fff;
   line-height: 1.4;
+  white-space: pre-line;
 }
 
 .game-question-description {
