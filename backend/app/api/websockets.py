@@ -130,6 +130,15 @@ def _config_dict(configurations) -> dict:
     }
 
 
+def _get_first_correct_pseudo(room) -> str | None:
+    correct_aps = [ap for ap in room.game_data.answered_players if ap.is_correct]
+    if not correct_aps:
+        return None
+    first = min(correct_aps, key=lambda ap: ap.answered_at)
+    player = room.find_player(first.player_uuid)
+    return player.pseudo if player else None
+
+
 async def _fetch_question(question_id: int):
     cached = manager.question_cache.get(question_id)
     if cached:
@@ -231,6 +240,7 @@ async def _send_next_question(room_code: str):
         "total_questions": len(room.game_data.question_ids),
         "question": question.question,
         "question_type": question.question_type.value,
+        "description": question.description,
         "image_url": str(question.image_url) if question.image_url else None,
         "time_limit": room.configurations.question_duration,
         "round": room.game_data.actual_round,
@@ -249,15 +259,19 @@ async def _question_timer(room_code: str, duration: int):
         from app.models.room import RoomDocument
         room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
         correct_answer = None
+        first_pseudo = None
         if room and room.game_data.question_ids:
             idx = room.game_data.current_question_index
             if idx < len(room.game_data.question_ids):
                 q = await _fetch_question(room.game_data.question_ids[idx])
                 if q and q.answers:
                     correct_answer = q.answers[0]
+        if room:
+            first_pseudo = _get_first_correct_pseudo(room)
 
         await sio.emit("time_up", {
             "correct_answer": correct_answer,
+            "first_pseudo": first_pseudo,
         }, room=room_code)
         await asyncio.sleep(DELAY_AFTER_TIME_UP)
         await _advance_question(room_code)
@@ -310,6 +324,7 @@ async def _check_all_answered(room_code: str):
 
             await sio.emit("all_answered", {
                 "correct_answer": correct_answer,
+                "first_pseudo": _get_first_correct_pseudo(room),
             }, room=room_code)
             await asyncio.sleep(DELAY_AFTER_ALL_ANSWERED)
             await _advance_question(room_code)
@@ -525,6 +540,7 @@ async def _handle_connect(sid, environ):
                 room_state_msg["current_question"] = {
                     "question": question.question,
                     "question_type": question.question_type.value,
+                    "description": question.description,
                     "image_url": str(question.image_url) if question.image_url else None,
                     "question_index": idx,
                     "total_questions": len(room.game_data.question_ids),
@@ -947,6 +963,9 @@ async def handle_skip_question(sid, data=None):
                 if q and q.answers:
                     correct_answer = q.answers[0]
 
-        await sio.emit("all_answered", {"correct_answer": correct_answer}, room=room_code)
+        await sio.emit("all_answered", {
+            "correct_answer": correct_answer,
+            "first_pseudo": _get_first_correct_pseudo(room),
+        }, room=room_code)
         await asyncio.sleep(DELAY_AFTER_ALL_ANSWERED)
         await _advance_question(room_code)

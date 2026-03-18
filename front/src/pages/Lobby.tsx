@@ -25,6 +25,7 @@ type Player = {
 type CurrentQuestion = {
   question: string;
   question_type: string;
+  description: string | null;
   image_url: string | null;
   time_limit: number;
   round: number;
@@ -135,6 +136,7 @@ function LobbyPage() {
   const [correctPlayerUuids, setCorrectPlayerUuids] = useState<Set<string>>(new Set());
   const [skippedPlayerUuids, setSkippedPlayerUuids] = useState<Set<string>>(new Set());
   const [allAnswered, setAllAnswered] = useState(false);
+  const [firstPseudo, setFirstPseudo] = useState<string | null>(null);
   const [currentRound, setCurrentRound] = useState(1);
   const [roundWins, setRoundWins] = useState<Record<string, number>>({});
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -297,6 +299,7 @@ function LobbyPage() {
         setCurrentQuestion({
           question: cq.question,
           question_type: cq.question_type,
+          description: cq.description ?? null,
           image_url: cq.image_url,
           time_limit: cq.time_limit,
           round: cq.round,
@@ -308,6 +311,7 @@ function LobbyPage() {
         setHasAnsweredCorrectly(false);
         setTimeUp(false);
         setAllAnswered(false);
+        setFirstPseudo(null);
         setCorrectAnswer(null);
         setMyAnswer('');
         setLastWrongAnswer({});
@@ -336,6 +340,7 @@ function LobbyPage() {
       setHasAnsweredCorrectly(false);
       setTimeUp(false);
       setAllAnswered(false);
+      setFirstPseudo(null);
       setCorrectAnswer(null);
       setRoundWonInfo(null);
     });
@@ -344,6 +349,7 @@ function LobbyPage() {
       setCurrentQuestion({
         question: msg.question,
         question_type: msg.question_type,
+        description: msg.description ?? null,
         image_url: msg.image_url,
         time_limit: msg.time_limit,
         round: msg.round,
@@ -356,6 +362,7 @@ function LobbyPage() {
       setHasAnsweredCorrectly(false);
       setTimeUp(false);
       setAllAnswered(false);
+      setFirstPseudo(null);
       setCorrectAnswer(null);
       setLastWrongAnswer({});
       setCorrectPlayerUuids(new Set());
@@ -382,6 +389,7 @@ function LobbyPage() {
 
     socket.on('all_answered', (msg) => {
       setCorrectAnswer(msg.correct_answer ?? null);
+      setFirstPseudo(msg.first_pseudo ?? null);
       setAllAnswered(true);
     });
 
@@ -401,6 +409,7 @@ function LobbyPage() {
       setTimeUp(true);
       setTimeLeft(0);
       setCorrectAnswer(msg.correct_answer ?? null);
+      setFirstPseudo(msg.first_pseudo ?? null);
     });
 
     socket.on('round_won', (msg) => {
@@ -428,6 +437,7 @@ function LobbyPage() {
       setHasAnsweredCorrectly(false);
       setTimeUp(false);
       setAllAnswered(false);
+      setFirstPseudo(null);
       setCorrectAnswer(null);
       setRoundWonInfo(null);
       setPlayers((prev) => prev.map((p) => ({ ...p, points: 0 })));
@@ -660,13 +670,19 @@ function LobbyPage() {
             <img src={currentQuestion.image_url} alt="" className="game-question-image" />
           )}
           <h2 className="game-question-text">{currentQuestion.question}</h2>
+          {currentQuestion.description && (
+            <p className="game-question-description">{currentQuestion.description}</p>
+          )}
         </div>
       )}
 
       {/* Answer input */}
       {timeUp ? (
         <div className="game-timeup-msg">
-          Temps écoulé !{correctAnswer && <> La réponse était : <strong>{correctAnswer}</strong></>}
+          <div>Temps écoulé !{correctAnswer && <> La réponse était : <strong>{correctAnswer}</strong></>}</div>
+          <div className="game-first-pseudo">
+            {firstPseudo ? <>{firstPseudo} a répondu en premier</> : <>Personne n'a répondu</>}
+          </div>
         </div>
       ) : hasAnsweredCorrectly ? (
         <div className="game-found-msg">
@@ -674,7 +690,10 @@ function LobbyPage() {
         </div>
       ) : allAnswered ? (
         <div className="game-timeup-msg">
-          Question terminée !{correctAnswer && <> La réponse était : <strong>{correctAnswer}</strong></>}
+          <div>Question terminée !{correctAnswer && <> La réponse était : <strong>{correctAnswer}</strong></>}</div>
+          <div className="game-first-pseudo">
+            {firstPseudo ? <>{firstPseudo} a répondu en premier</> : <>Personne n'a répondu</>}
+          </div>
         </div>
       ) : (
         <div className="game-answer-area game-answer-area--with-skip">
@@ -838,7 +857,7 @@ function LobbyPage() {
                   )}
                 </div>
                 {gameState === 'PLAYING' && wrongAnswer && !isCorrect && (
-                  <span className="player-wrong-answer">{truncate(wrongAnswer, 25)}</span>
+                  <span className="player-wrong-answer">&#x2716; {truncate(wrongAnswer, 25)}</span>
                 )}
               </div>
               {gameState === 'PLAYING' && (

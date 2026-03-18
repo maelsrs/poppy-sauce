@@ -18,6 +18,7 @@ class QuestionDocument(Document):
     category: str = Field(default="Grand public", index=True)
     question: str = Field(...,)
     answers: List[str] = Field(default_factory=list,)
+    description: Optional[str] = Field(default=None)
     image_url: Optional[str] = Field(default=None)
 
     class Settings:
