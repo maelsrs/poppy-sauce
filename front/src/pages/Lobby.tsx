@@ -134,6 +134,7 @@ function LobbyPage() {
   const [lastWrongAnswer, setLastWrongAnswer] = useState<Record<string, string>>({});
   const [correctPlayerUuids, setCorrectPlayerUuids] = useState<Set<string>>(new Set());
   const [skippedPlayerUuids, setSkippedPlayerUuids] = useState<Set<string>>(new Set());
+  const [allAnswered, setAllAnswered] = useState(false);
   const [currentRound, setCurrentRound] = useState(1);
   const [roundWins, setRoundWins] = useState<Record<string, number>>({});
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -306,6 +307,7 @@ function LobbyPage() {
         setCurrentRound(cq.round);
         setHasAnsweredCorrectly(false);
         setTimeUp(false);
+        setAllAnswered(false);
         setCorrectAnswer(null);
         setMyAnswer('');
         setLastWrongAnswer({});
@@ -333,6 +335,7 @@ function LobbyPage() {
       setLastWrongAnswer({});
       setHasAnsweredCorrectly(false);
       setTimeUp(false);
+      setAllAnswered(false);
       setCorrectAnswer(null);
       setRoundWonInfo(null);
     });
@@ -352,6 +355,7 @@ function LobbyPage() {
       setMyAnswer('');
       setHasAnsweredCorrectly(false);
       setTimeUp(false);
+      setAllAnswered(false);
       setCorrectAnswer(null);
       setLastWrongAnswer({});
       setCorrectPlayerUuids(new Set());
@@ -378,6 +382,7 @@ function LobbyPage() {
 
     socket.on('all_answered', (msg) => {
       setCorrectAnswer(msg.correct_answer ?? null);
+      setAllAnswered(true);
     });
 
     socket.on('player_skipped', (msg) => {
@@ -422,6 +427,7 @@ function LobbyPage() {
       setLastWrongAnswer({});
       setHasAnsweredCorrectly(false);
       setTimeUp(false);
+      setAllAnswered(false);
       setCorrectAnswer(null);
       setRoundWonInfo(null);
       setPlayers((prev) => prev.map((p) => ({ ...p, points: 0 })));
@@ -665,6 +671,10 @@ function LobbyPage() {
       ) : hasAnsweredCorrectly ? (
         <div className="game-found-msg">
           Bonne réponse !{correctAnswer ? <> C'était : <strong>{correctAnswer}</strong></> : ' En attente des autres...'}
+        </div>
+      ) : allAnswered ? (
+        <div className="game-timeup-msg">
+          Question terminée !{correctAnswer && <> La réponse était : <strong>{correctAnswer}</strong></>}
         </div>
       ) : (
         <div className="game-answer-area game-answer-area--with-skip">
