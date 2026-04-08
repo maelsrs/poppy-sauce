@@ -2,10 +2,10 @@ from math import ceil
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 
 from app.core.security import get_current_user
-from app.models.question import QuestionDocument
+from app.models.question import QuestionDocument, QuestionType
 from app.models.user import UserDocument, UserPublic, UserRank
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -31,6 +31,7 @@ class QuestionOut(BaseModel):
     category: str
     question: str
     answers: List[str]
+    description: Optional[str] = None
     image_url: Optional[str] = None
 
 
@@ -40,6 +41,42 @@ class PaginatedQuestions(BaseModel):
     page: int
     per_page: int
     pages: int
+
+
+class UpdateUserRequest(BaseModel):
+    username: Optional[str] = Field(default=None, min_length=3, max_length=64)
+    email: Optional[EmailStr] = None
+    rank: Optional[UserRank] = None
+
+
+class CreateQuestionRequest(BaseModel):
+    question: str = Field(..., min_length=1)
+    answers: List[str] = Field(..., min_items=1)
+    category: str = Field(default="Grand public", min_length=1)
+    question_type: str = Field(default="text")
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+
+
+class UpdateQuestionRequest(BaseModel):
+    question: Optional[str] = Field(default=None, min_length=1)
+    answers: Optional[List[str]] = None
+    category: Optional[str] = Field(default=None, min_length=1)
+    question_type: Optional[str] = None
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+
+
+def _question_to_out(q: QuestionDocument) -> QuestionOut:
+    return QuestionOut(
+        question_id=q.question_id,
+        question_type=q.question_type.value,
+        category=q.category,
+        question=q.question,
+        answers=q.answers,
+        description=q.description,
+        image_url=str(q.image_url) if q.image_url else None,
+    )
 
 
 @router.get("/users", response_model=PaginatedUsers)
@@ -83,14 +120,7 @@ async def admin_list_questions(
     questions = await QuestionDocument.find({"category": category}).skip(skip).limit(per_page).to_list() if category else await QuestionDocument.find_all().skip(skip).limit(per_page).to_list()
     return PaginatedQuestions(
         items=[
-            QuestionOut(
-                question_id=q.question_id,
-                question_type=q.question_type.value,
-                category=q.category,
-                question=q.question,
-                answers=q.answers,
-                image_url=str(q.image_url) if q.image_url else None,
-            )
+            _question_to_out(q)
             for q in questions
         ],
         total=total,
@@ -98,3 +128,104 @@ async def admin_list_questions(
         per_page=per_page,
         pages=pages,
     )
+
+
+# ── Users CRUD ──────────────────────────────────────────────────────────────
+
+@router.put("/users/{uuid}", response_model=UserPublic)
+async def admin_update_user(
+    uuid: str,
+    payload: UpdateUserRequest,
+    _admin: UserDocument = Depends(require_admin),
+):
+    user = await UserDocument.find_one(UserDocument.uuid == uuid)
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+
+    if payload.username is not None:
+        existing = await UserDocument.find_one(UserDocument.username == payload.username)
+        if existing and existing.uuid != uuid:
+            raise HTTPException(status_code=409, detail="Ce pseudo est déjà pris.")
+        user.username = payload.username
+
+    if payload.email is not None:
+        existing = await UserDocument.find_one({"email": payload.email.lower()})
+        if existing and existing.uuid != uuid:
+            raise HTTPException(status_code=409, detail="Cet email est déjà utilisé.")
+        user.email = payload.email.lower()
+
+    if payload.rank is not None:
+        user.rank = payload.rank
+
+    await user.save()
+    return user.to_public()
+
+
+@router.delete("/users/{uuid}", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_delete_user(
+    uuid: str,
+    admin: UserDocument = Depends(require_admin),
+):
+    if admin.uuid == uuid:
+        raise HTTPException(status_code=400, detail="Impossible de supprimer votre propre compte.")
+    user = await UserDocument.find_one(UserDocument.uuid == uuid)
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+    await user.delete()
+
+
+# ── Questions CRUD ──────────────────────────────────────────────────────────
+
+@router.post("/questions", response_model=QuestionOut, status_code=status.HTTP_201_CREATED)
+async def admin_create_question(
+    payload: CreateQuestionRequest,
+    _admin: UserDocument = Depends(require_admin),
+):
+    q = QuestionDocument(
+        question=payload.question,
+        answers=payload.answers,
+        category=payload.category,
+        question_type=QuestionType(payload.question_type),
+        description=payload.description,
+        image_url=payload.image_url,
+    )
+    await q.insert()
+    return _question_to_out(q)
+
+
+@router.put("/questions/{question_id}", response_model=QuestionOut)
+async def admin_update_question(
+    question_id: int,
+    payload: UpdateQuestionRequest,
+    _admin: UserDocument = Depends(require_admin),
+):
+    q = await QuestionDocument.find_one(QuestionDocument.question_id == question_id)
+    if not q:
+        raise HTTPException(status_code=404, detail="Question introuvable.")
+
+    if payload.question is not None:
+        q.question = payload.question
+    if payload.answers is not None:
+        q.answers = payload.answers
+    if payload.category is not None:
+        q.category = payload.category
+    if payload.question_type is not None:
+        q.question_type = QuestionType(payload.question_type)
+    if payload.description is not None:
+        q.description = payload.description
+    if payload.image_url is not None:
+        q.image_url = payload.image_url
+
+    await q.save()
+    return _question_to_out(q)
+
+
+@router.delete("/questions/{question_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_delete_question(
+    question_id: int,
+    _admin: UserDocument = Depends(require_admin),
+):
+    q = await QuestionDocument.find_one(QuestionDocument.question_id == question_id)
+    if not q:
+        raise HTTPException(status_code=404, detail="Question introuvable.")
+    await q.delete()
