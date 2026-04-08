@@ -246,6 +246,7 @@ async def _send_next_question(room_code: str):
         await _send_next_question(room_code)
         return
 
+    room.game_data.question_sent_at = _now_ms()
     room.game_data.first_correct_at = None
     room.game_data.answered_players = []
     if q_id not in room.game_data.used_question_ids:
@@ -472,6 +473,32 @@ async def _end_game(room_code: str, *, winner_uuid: Optional[str] = None, reason
         "reason": reason,
     }, room=room_code)
 
+    from app.models.user import UserDocument
+
+    actual_winner_uuid = winner_data["player_uuid"] if winner_data else None
+
+    for p in room.players_info:
+        user = await UserDocument.find_one(UserDocument.uuid == p.player_uuid)
+        if not user:
+            continue
+
+        user.games_played += 1
+        if actual_winner_uuid and p.player_uuid == actual_winner_uuid:
+            user.wins += 1
+        if p.points > user.best_score:
+            user.best_score = p.points
+
+        player_answers = [a for a in room.game_data.all_answers if a.player_uuid == p.player_uuid]
+        user.total_answers += len(player_answers)
+        user.correct_answers += sum(1 for a in player_answers if a.is_correct)
+
+        for a in player_answers:
+            if a.question_started_at and a.answered_at > a.question_started_at:
+                user.total_response_time_ms += a.answered_at - a.question_started_at
+                user.total_responses += 1
+
+        await user.save()
+
     await asyncio.sleep(DELAY_AFTER_GAME_FINISHED)
 
     room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
@@ -487,8 +514,6 @@ async def _end_game(room_code: str, *, winner_uuid: Optional[str] = None, reason
         "game_state": "WAITING",
     }, room=room_code)
 
-
-# --- Socket.IO event handlers ---
 
 @sio.event
 async def connect(sid, environ, auth):
@@ -795,15 +820,20 @@ async def handle_submit_answer(sid, data=None):
         if player:
             player.points += points
 
+    ap = AnsweredPlayer(
+        player_uuid=player_uuid,
+        answered_at=now,
+        is_correct=is_correct,
+        answer=answer_text,
+        points_awarded=points,
+        question_started_at=room.game_data.question_sent_at,
+    )
+
     should_record = is_correct or room.configurations.show_answers
     if should_record:
-        room.game_data.answered_players.append(AnsweredPlayer(
-            player_uuid=player_uuid,
-            answered_at=now,
-            is_correct=is_correct,
-            answer=answer_text,
-            points_awarded=points,
-        ))
+        room.game_data.answered_players.append(ap)
+
+    room.game_data.all_answers.append(ap)
 
     await room.save()
 

@@ -148,7 +148,7 @@ function HomePage() {
             }
           />
 
-          <ActionCard title="Stats" tone="slate" icon={Gamepad2} subIcon={<span>🎮</span>} />
+          <ActionCard title="Stats" tone="slate" icon={Gamepad2} subIcon={<span>🎮</span>} onClick={() => navigate('/stats')} />
 
           <ActionCard
             title="Rejoindre une partie"
