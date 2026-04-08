@@ -263,6 +263,7 @@ function LobbyPage() {
       path: '/socket.io/',
       query: { room_code: roomCode, player_uuid: uuid, pseudo },
       transports: ['websocket'],
+      withCredentials: true,
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionAttempts: 10,

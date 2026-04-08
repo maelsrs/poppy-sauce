@@ -17,7 +17,9 @@ from app.core.config import (
     QUESTION_BATCH_SIZE,
 )
 
-sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
+from app.core.config import CORS_ORIGINS
+
+sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=CORS_ORIGINS)
 
 
 def _now_ms() -> int:
@@ -533,6 +535,41 @@ async def connect(sid, environ, auth):
         raise ConnectionRefusedError(f"Erreur interne: {e}")
 
 
+def _parse_cookie_header(environ) -> dict:
+    from http.cookies import SimpleCookie
+    cookie_header = environ.get("HTTP_COOKIE", "")
+    if not cookie_header:
+        for header, value in environ.get("asgi.scope", {}).get("headers", []):
+            if header == b"cookie":
+                cookie_header = value.decode("utf-8", errors="ignore")
+                break
+    cookies = SimpleCookie()
+    cookies.load(cookie_header)
+    return {k: v.value for k, v in cookies.items()}
+
+
+async def _resolve_authenticated_user(environ):
+    from jose import JWTError, jwt as jose_jwt
+    from app.core.config import JWT_SECRET_KEY, JWT_ALGORITHM
+    from app.models.user import UserDocument
+    from app.core.security import COOKIE_NAME
+
+    cookies = _parse_cookie_header(environ)
+    token = cookies.get(COOKIE_NAME)
+    if not token:
+        return None
+
+    try:
+        payload = jose_jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        subject = payload.get("sub")
+        if not subject:
+            return None
+    except (JWTError, ValueError):
+        return None
+
+    return await UserDocument.find_one(UserDocument.uuid == subject)
+
+
 async def _handle_connect(sid, environ):
     from app.models.room import GameState, PlayerInfo, RoomDocument
 
@@ -541,8 +578,16 @@ async def _handle_connect(sid, environ):
     player_uuid = qs.get("player_uuid", [""])[0]
     pseudo = qs.get("pseudo", [None])[0]
 
-    if not room_code or not player_uuid:
-        raise ConnectionRefusedError("room_code et player_uuid requis")
+    if not room_code:
+        raise ConnectionRefusedError("room_code requis")
+
+    auth_user = await _resolve_authenticated_user(environ)
+    if auth_user:
+        player_uuid = auth_user.uuid
+        pseudo = auth_user.username
+
+    if not player_uuid:
+        raise ConnectionRefusedError("player_uuid requis")
 
     room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
     if not room:
