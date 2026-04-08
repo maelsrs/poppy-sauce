@@ -55,6 +55,7 @@ class AnsweredPlayer(BaseModel):
     is_correct: bool
     answer: str
     points_awarded: int
+    question_started_at: Optional[int] = Field(default=None)
 
 
 class RoundData(BaseModel):
@@ -70,10 +71,12 @@ class GameData(BaseModel):
     rounds: List[RoundData] = Field(default_factory=list)
     question_ids: List[int] = Field(default_factory=list)
     current_question_index: int = Field(default=0, ge=0)
+    question_sent_at: Optional[int] = Field(default=None)
     first_correct_at: Optional[int] = Field(default=None)
     answered_players: List[AnsweredPlayer] = Field(default_factory=list)
     round_wins: Dict[str, int] = Field(default_factory=dict)
     used_question_ids: List[int] = Field(default_factory=list)
+    all_answers: List[AnsweredPlayer] = Field(default_factory=list)
 
 
 class RoomDocument(Document):

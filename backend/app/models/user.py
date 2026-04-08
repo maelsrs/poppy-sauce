@@ -24,6 +24,14 @@ class UserDocument(Document):
     first_login: Optional[datetime] = Field(default=None)
     playtime: int = Field(default=0, ge=0)
 
+    games_played: int = Field(default=0, ge=0)
+    wins: int = Field(default=0, ge=0)
+    correct_answers: int = Field(default=0, ge=0)
+    total_answers: int = Field(default=0, ge=0)
+    best_score: int = Field(default=0, ge=0)
+    total_response_time_ms: int = Field(default=0, ge=0)
+    total_responses: int = Field(default=0, ge=0)
+
     class Settings:
         name = "users"
 
@@ -45,6 +53,13 @@ class UserPublic(BaseModel):
     first_login: Optional[datetime] = None
     level: int = 1
     playtime: int = 0
+    games_played: int = 0
+    wins: int = 0
+    correct_answers: int = 0
+    total_answers: int = 0
+    best_score: int = 0
+    total_response_time_ms: int = 0
+    total_responses: int = 0
 
     class Config:
         orm_mode = True
