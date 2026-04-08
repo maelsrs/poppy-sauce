@@ -1421,7 +1421,7 @@
 }
 
 .player-row--skipped {
-  opacity: 0.4;
+  opacity: 0.65;
 }
 
 .player-row--skipped .player-name::after {

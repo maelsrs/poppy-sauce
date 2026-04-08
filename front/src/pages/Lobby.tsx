@@ -157,6 +157,7 @@ function LobbyPage() {
 
   const timerRef = useRef<number | null>(null);
   const answerInputRef = useRef<HTMLInputElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
 
   const isOwner = useMemo(
     () => players.some((p) => p.player_uuid === playerUuid && p.is_owner),
@@ -217,10 +218,12 @@ function LobbyPage() {
   }, [currentQuestion, timeUp, allAnswered]);
 
   useEffect(() => {
-    if (currentQuestion && !hasAnsweredCorrectly && !timeUp) {
+    if (currentQuestion && !hasAnsweredCorrectly && !timeUp && !allAnswered) {
       setTimeout(() => answerInputRef.current?.focus(), 100);
+    } else if (hasAnsweredCorrectly || timeUp || allAnswered || gameState !== 'PLAYING') {
+      setTimeout(() => chatInputRef.current?.focus(), 100);
     }
-  }, [currentQuestion, hasAnsweredCorrectly, timeUp]);
+  }, [currentQuestion, hasAnsweredCorrectly, timeUp, allAnswered, gameState]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -697,13 +700,18 @@ function LobbyPage() {
         </div>
       )}
 
-      {(timeUp || hasAnsweredCorrectly || allAnswered) ? (
+      {(timeUp || allAnswered) ? (
         <div className={`game-reveal ${hasAnsweredCorrectly ? 'game-reveal--correct' : 'game-reveal--missed'}`}>
           {correctAnswer && <div className="game-reveal__answer">{correctAnswer}</div>}
           {answerDescription && <div className="game-reveal__description">{answerDescription}</div>}
           <div className="game-reveal__footer">
             {firstPseudo ? <>{firstPseudo} a trouvé en premier</> : <>Personne n'a trouvé</>}
           </div>
+        </div>
+      ) : hasAnsweredCorrectly ? (
+        <div className="game-reveal game-reveal--correct">
+          <div className="game-reveal__answer">Trouvé !</div>
+          <div className="game-reveal__footer">En attente des autres joueurs...</div>
         </div>
       ) : (
         <div className="game-answer-area game-answer-area--with-skip">
@@ -1159,6 +1167,7 @@ function LobbyPage() {
           </div>
           <div className="chat-input-area">
             <input
+              ref={chatInputRef}
               type="text"
               className="chat-input"
               value={chatInput}
