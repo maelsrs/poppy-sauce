@@ -65,7 +65,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 fastapi_app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

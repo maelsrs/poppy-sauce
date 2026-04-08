@@ -10,13 +10,10 @@ export type AuthUser = {
 };
 
 export type AuthResponse = {
-  access_token: string;
-  token_type: string;
   user: AuthUser;
 };
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8081';
-const TOKEN_KEY = 'poppy.auth.token';
 
 const buildUrl = (path: string) => `${API_BASE}${path}`;
 const translateDetail = (text: string): string => {
@@ -62,7 +59,7 @@ const parseError = async (response: Response): Promise<Error> => {
     return new Error('Une erreur est survenue.');
   } catch {
     const text = await response.text();
-    const networkMsg = 'Impossible de contacter le serveur. Vérifie qu’il tourne et que CORS est autorisé.';
+    const networkMsg = "Le serveur est temporairement indisponible. Veuillez réessayer dans quelques instants.";
     return new Error(text || networkMsg);
   }
 };
@@ -74,6 +71,7 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
   try {
     const response = await fetch(url, {
       ...options,
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         ...(options.headers || {}),
@@ -95,16 +93,6 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
   }
 }
 
-export const getStoredToken = (): string | null => localStorage.getItem(TOKEN_KEY);
-
-export const storeToken = (token: string | null) => {
-  if (!token) {
-    localStorage.removeItem(TOKEN_KEY);
-    return;
-  }
-  localStorage.setItem(TOKEN_KEY, token);
-};
-
 export const registerRequest = async (email: string, username: string, password: string): Promise<AuthResponse> =>
   request<AuthResponse>('/auth/register', {
     method: 'POST',
@@ -117,9 +105,9 @@ export const loginRequest = async (email: string, password: string): Promise<Aut
     body: JSON.stringify({ email, password }),
   });
 
-export const fetchMe = async (token: string): Promise<AuthUser> =>
-  request<AuthUser>('/auth/me', {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+export const fetchMe = async (): Promise<AuthUser> =>
+  request<AuthUser>('/auth/me');
+
+export const logoutRequest = async (): Promise<void> => {
+  await request<unknown>('/auth/logout', { method: 'POST' });
+};
