@@ -473,7 +473,6 @@ async def _end_game(room_code: str, *, winner_uuid: Optional[str] = None, reason
         "reason": reason,
     }, room=room_code)
 
-    # --- Update user stats ---
     from app.models.user import UserDocument
 
     actual_winner_uuid = winner_data["player_uuid"] if winner_data else None
@@ -515,8 +514,6 @@ async def _end_game(room_code: str, *, winner_uuid: Optional[str] = None, reason
         "game_state": "WAITING",
     }, room=room_code)
 
-
-# --- Socket.IO event handlers ---
 
 @sio.event
 async def connect(sid, environ, auth):

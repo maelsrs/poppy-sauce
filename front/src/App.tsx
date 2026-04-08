@@ -5,6 +5,7 @@ import HomePage from './pages/Home';
 import PublicGamesPage from './pages/PublicGames';
 import AuthPage from './pages/Auth';
 import LobbyPage from './pages/Lobby';
+import StatsPage from './pages/Stats';
 
 function App() {
   const location = useLocation();
@@ -35,6 +36,7 @@ function App() {
           <Route path="/lobby" element={<LobbyPage />} />
           <Route path="/game/:code" element={<LobbyPage />} />
           <Route path="/public-games" element={<PublicGamesPage />} />
+          <Route path="/stats" element={<StatsPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="*" element={<div className="not-found">Page introuvable</div>} />
         </Routes>
