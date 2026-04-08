@@ -473,31 +473,38 @@ async def _end_game(room_code: str, *, winner_uuid: Optional[str] = None, reason
         "reason": reason,
     }, room=room_code)
 
-    from app.models.user import UserDocument
+    has_been_played = len(room.game_data.all_answers) > 0
 
-    actual_winner_uuid = winner_data["player_uuid"] if winner_data else None
+    if has_been_played:
+        from app.models.user import UserDocument
 
-    for p in room.players_info:
-        user = await UserDocument.find_one(UserDocument.uuid == p.player_uuid)
-        if not user:
-            continue
+        actual_winner_uuid = (
+            winner_data["player_uuid"]
+            if winner_data and reason != "owner_ended"
+            else None
+        )
 
-        user.games_played += 1
-        if actual_winner_uuid and p.player_uuid == actual_winner_uuid:
-            user.wins += 1
-        if p.points > user.best_score:
-            user.best_score = p.points
+        for p in room.players_info:
+            user = await UserDocument.find_one(UserDocument.uuid == p.player_uuid)
+            if not user:
+                continue
 
-        player_answers = [a for a in room.game_data.all_answers if a.player_uuid == p.player_uuid]
-        user.total_answers += len(player_answers)
-        user.correct_answers += sum(1 for a in player_answers if a.is_correct)
+            user.games_played += 1
+            if actual_winner_uuid and p.player_uuid == actual_winner_uuid:
+                user.wins += 1
+            if p.points > user.best_score:
+                user.best_score = p.points
 
-        for a in player_answers:
-            if a.question_started_at and a.answered_at > a.question_started_at:
-                user.total_response_time_ms += a.answered_at - a.question_started_at
-                user.total_responses += 1
+            player_answers = [a for a in room.game_data.all_answers if a.player_uuid == p.player_uuid]
+            user.total_answers += len(player_answers)
+            user.correct_answers += sum(1 for a in player_answers if a.is_correct)
 
-        await user.save()
+            for a in player_answers:
+                if a.question_started_at and a.answered_at > a.question_started_at:
+                    user.total_response_time_ms += a.answered_at - a.question_started_at
+                    user.total_responses += 1
+
+            await user.save()
 
     await asyncio.sleep(DELAY_AFTER_GAME_FINISHED)
 
