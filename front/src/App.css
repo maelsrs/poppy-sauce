@@ -1,6 +1,5 @@
 :root {
   font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  /* Lobby specific tokens */
   --lobby-bg: #0b0e14;
   --lobby-panel: #11141b;
   --lobby-border: #272a32;
@@ -602,7 +601,6 @@
   font-weight: 600;
 }
 
-/* Lobby shell layout */
 .lobby-shell {
   display: flex;
   height: 100%;
@@ -1197,7 +1195,6 @@
   }
 }
 
-/* --- Game Screen --- */
 
 .game-screen {
   display: flex;
@@ -1391,7 +1388,6 @@
   font-size: 1rem;
 }
 
-/* Player row: correct state */
 .player-row--correct {
   background: rgba(74, 222, 128, 0.1) !important;
 }
@@ -1400,7 +1396,6 @@
   color: #4ade80;
 }
 
-/* Player row: skipped state */
 .player-row--skipped {
   opacity: 0.4;
 }
@@ -1431,7 +1426,6 @@
   margin-left: 4px;
 }
 
-/* --- Finished Screen --- */
 
 .game-finished-screen {
   text-align: center;
@@ -1513,8 +1507,6 @@
   font-size: 0.85rem;
 }
 
-/* Toggle row */
-
 .toggle-row {
   display: flex;
   align-items: center;
@@ -1554,7 +1546,6 @@
   background: rgba(239, 68, 68, 0.2);
 }
 
-/* --- Player Profile Popup --- */
 
 .player-profile-popup {
   position: absolute;
@@ -1653,7 +1644,6 @@
   background: rgba(37, 99, 235, 0.12) !important;
 }
 
-/* --- Pseudo Popup --- */
 
 .pseudo-popup {
   background: var(--lobby-panel);
@@ -1712,8 +1702,6 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
-
-/* --- Chat --- */
 
 .chat-section {
   flex: 0 0 auto;
@@ -1799,7 +1787,6 @@
   background: #1d4ed8;
 }
 
-/* --- Admin Page --- */
 
 .admin-nav {
   background: #0f172a;
@@ -2108,6 +2095,33 @@
   color: #475569;
   font-weight: 700;
   padding: 0 4px;
+}
+
+.admin-action-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #e2e8f0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-right: 4px;
+  transition: background 0.15s;
+}
+
+.admin-action-btn:hover {
+  background: #334155;
+}
+
+.admin-action-btn--danger {
+  border-color: #7f1d1d;
+  background: #450a0a;
+  color: #fca5a5;
+}
+
+.admin-action-btn--danger:hover {
+  background: #7f1d1d;
 }
 
 @media (max-width: 640px) {
