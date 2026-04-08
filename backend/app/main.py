@@ -10,6 +10,7 @@ from app.api.routes.admin import router as admin_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.health import router as health_router
 from app.api.routes.rooms import router as rooms_router
+from app.api.routes.stats import router as stats_router
 from app.api.routes.users import router as users_router
 from app.api.websockets import sio
 from app.core.config import CORS_ORIGINS
@@ -73,6 +74,7 @@ fastapi_app.add_middleware(
 fastapi_app.include_router(health_router)
 fastapi_app.include_router(auth_router)
 fastapi_app.include_router(rooms_router)
+fastapi_app.include_router(stats_router)
 fastapi_app.include_router(users_router)
 fastapi_app.include_router(admin_router)
 
