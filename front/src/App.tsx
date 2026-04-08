@@ -1,5 +1,6 @@
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import './App.css';
+import { useAuth } from './auth/AuthContext';
 import AdminPage from './pages/Admin';
 import HomePage from './pages/Home';
 import PublicGamesPage from './pages/PublicGames';
@@ -9,6 +10,7 @@ import StatsPage from './pages/Stats';
 
 function App() {
   const location = useLocation();
+  const { user } = useAuth();
   const isLobby = location.pathname.startsWith('/lobby') || location.pathname.startsWith('/game/');
 
   return (
@@ -24,6 +26,7 @@ function App() {
           <a href="" target="_blank" rel="noopener noreferrer">
             Discord
           </a>
+          {user?.rank === 'Admin' && <Link to="/admin">Admin</Link>}
         </div>
       </nav>
 

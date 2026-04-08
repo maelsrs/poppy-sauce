@@ -130,7 +130,6 @@ async def admin_list_questions(
     )
 
 
-# ── Users CRUD ──────────────────────────────────────────────────────────────
 
 @router.put("/users/{uuid}", response_model=UserPublic)
 async def admin_update_user(
@@ -174,7 +173,6 @@ async def admin_delete_user(
     await user.delete()
 
 
-# ── Questions CRUD ──────────────────────────────────────────────────────────
 
 @router.post("/questions", response_model=QuestionOut, status_code=status.HTTP_201_CREATED)
 async def admin_create_question(

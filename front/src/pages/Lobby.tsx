@@ -5,7 +5,6 @@ import { useAuth } from '../auth/AuthContext';
 import { Field } from '../components/ui';
 import { request } from '../services/auth';
 
-// --- Types ---
 type CategoryMode = 'uniquement' | 'enlever';
 
 type Category = {
@@ -64,7 +63,6 @@ const CATEGORY_POOL = [
   'J-pop', 'Jeux de société', 'Jeux indé', 'Jeux vidéo',
 ];
 
-// --- Icons ---
 const IconGear = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
@@ -659,11 +657,9 @@ function LobbyPage() {
     [players],
   );
 
-  // --- Render ---
 
   const renderPlayingScreen = () => (
     <div className="game-screen">
-      {/* Header */}
       <div className="game-header">
         <div className="game-header__left">
           <span className="game-round-badge">Round {currentRound}</span>
@@ -678,14 +674,12 @@ function LobbyPage() {
         </div>
       </div>
 
-      {/* Round won overlay */}
       {roundWonInfo && (
         <div className="round-won-banner">
           {roundWonInfo.pseudo} a remporté le round {roundWonInfo.round} !
         </div>
       )}
 
-      {/* Question */}
       {currentQuestion && (
         <div className="game-question-area">
           {currentQuestion.image_url && (
@@ -698,7 +692,6 @@ function LobbyPage() {
         </div>
       )}
 
-      {/* Answer input */}
       {timeUp ? (
         <div className="game-timeup-msg">
           <div>Temps écoulé !{correctAnswer && <> La réponse était : <strong>{correctAnswer}</strong></>}</div>
