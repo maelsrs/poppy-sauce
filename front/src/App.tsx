@@ -20,7 +20,7 @@ function App() {
         <div className="navbar__links">
           <Link to="/">Accueil</Link>
           <Link to="/public-games">Parties publiques</Link>
-          <a href="https://tenor.com/fr/view/shrek-shrek-dance-dancing-shrek-gif-4002588423353146293" target="_blank" rel="noopener noreferrer">
+          <a href="" target="_blank" rel="noopener noreferrer">
             Discord
           </a>
         </div>
@@ -40,11 +40,13 @@ function App() {
         </Routes>
       </main>
 
-      <footer className="footer">
-        <a href="https://tenor.com/fr/view/shrek-shrek-dance-dancing-shrek-gif-4002588423353146293" target="_blank" rel="noopener noreferrer">
-          Discord
-        </a>
-      </footer>
+      {!isLobby && (
+        <footer className="footer">
+          <a href="" target="_blank" rel="noopener noreferrer">
+            Discord
+          </a>
+        </footer>
+      )}
     </div>
   );
 }
