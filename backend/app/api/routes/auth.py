@@ -38,7 +38,7 @@ def hash_password(raw_password: str) -> str:
 def build_response(user: UserDocument) -> JSONResponse:
     token = create_access_token(user.uuid)
     body = AuthResponse(user=user.to_public())
-    response = JSONResponse(content=body.model_dump(), status_code=200)
+    response = JSONResponse(content=body.dict(), status_code=200)
     response.set_cookie(
         key=COOKIE_NAME,
         value=token,
@@ -95,7 +95,7 @@ async def login(payload: LoginRequest):
 @router.post("/logout")
 async def logout_route():
     response = JSONResponse(content={"detail": "ok"})
-    response.delete_cookie(key=COOKIE_NAME, httponly=True, samesite="lax", secure=False)
+    response.delete_cookie(key=COOKIE_NAME, httponly=True, samesite="lax", secure=True)
     return response
 
 
