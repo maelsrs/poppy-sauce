@@ -1,7 +1,10 @@
 from datetime import datetime, timezone
 
+import json
+
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
 
@@ -38,7 +41,7 @@ def hash_password(raw_password: str) -> str:
 def build_response(user: UserDocument) -> JSONResponse:
     token = create_access_token(user.uuid)
     body = AuthResponse(user=user.to_public())
-    response = JSONResponse(content=body.dict(), status_code=200)
+    response = JSONResponse(content=jsonable_encoder(body), status_code=200)
     response.set_cookie(
         key=COOKIE_NAME,
         value=token,
