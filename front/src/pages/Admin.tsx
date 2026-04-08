@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { getStoredToken, request } from '../services/auth';
+import { request } from '../services/auth';
 
 type PaginatedUsers = {
   items: {
@@ -57,31 +57,24 @@ function AdminPage() {
     }
   }, [authLoading, user, navigate]);
 
-  const authHeaders = (): HeadersInit => {
-    const token = getStoredToken();
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  };
-
   useEffect(() => {
     if (!user || user.rank !== 'Admin') return;
     setLoading(true);
-    request<PaginatedUsers>(`/admin/users?page=${userPage}&per_page=20`, { headers: authHeaders() })
+    request<PaginatedUsers>(`/admin/users?page=${userPage}&per_page=20`)
       .then(setUsersData)
       .finally(() => setLoading(false));
   }, [userPage, user]);
 
   useEffect(() => {
     if (!user || user.rank !== 'Admin') return;
-    request<string[]>('/admin/questions/categories', { headers: authHeaders() }).then(setCategories);
+    request<string[]>('/admin/questions/categories').then(setCategories);
   }, [user]);
 
   useEffect(() => {
     if (!user || user.rank !== 'Admin') return;
     setLoading(true);
     const catParam = selectedCategory ? `&category=${encodeURIComponent(selectedCategory)}` : '';
-    request<PaginatedQuestions>(`/admin/questions?page=${questionPage}&per_page=20${catParam}`, {
-      headers: authHeaders(),
-    })
+    request<PaginatedQuestions>(`/admin/questions?page=${questionPage}&per_page=20${catParam}`)
       .then(setQuestionsData)
       .finally(() => setLoading(false));
   }, [questionPage, selectedCategory, user]);

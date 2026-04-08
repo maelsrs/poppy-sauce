@@ -1,9 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { fetchMe, getStoredToken, loginRequest, registerRequest, storeToken, type AuthResponse, type AuthUser } from '../services/auth';
+import { fetchMe, loginRequest, logoutRequest, registerRequest, type AuthUser } from '../services/auth';
 
 type AuthContextValue = {
   user: AuthUser | null;
-  token: string | null;
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
@@ -17,34 +16,21 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const stored = getStoredToken();
-    if (!stored) {
-      setLoading(false);
-      return;
-    }
-
-    setToken(stored);
-    fetchMe(stored)
+    fetchMe()
       .then((me) => setUser(me))
-      .catch(() => {
-        storeToken(null);
-        setToken(null);
-      })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  const handleAuth = useCallback(async (action: () => Promise<AuthResponse>) => {
+  const handleAuth = useCallback(async (action: () => Promise<{ user: AuthUser }>) => {
     setError(null);
     setLoading(true);
     try {
       const response = await action();
-      setToken(response.access_token);
-      storeToken(response.access_token);
       setUser(response.user);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Une erreur est survenue';
@@ -62,32 +48,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [handleAuth],
   );
 
-  const logout = useCallback(() => {
-    storeToken(null);
-    setToken(null);
+  const logout = useCallback(async () => {
+    await logoutRequest().catch(() => {});
     setUser(null);
   }, []);
 
   const refresh = useCallback(async () => {
-    if (!token) {
-      return;
-    }
     setLoading(true);
     try {
-      const me = await fetchMe(token);
+      const me = await fetchMe();
       setUser(me);
     } catch {
-      logout();
+      setUser(null);
     } finally {
       setLoading(false);
     }
-  }, [logout, token]);
+  }, []);
 
   const clearError = useCallback(() => setError(null), []);
 
   const value: AuthContextValue = {
     user,
-    token,
     loading,
     error,
     login,

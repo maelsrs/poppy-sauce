@@ -2,16 +2,15 @@ from datetime import datetime, timezone
 
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
 
-from app.core.security import create_access_token, get_current_user
+from app.core.security import COOKIE_MAX_AGE, COOKIE_NAME, create_access_token, get_current_user
 from app.db.client import ensure_db
 from app.models.user import UserCreate, UserDocument, UserPublic, UserRank
 
 
 class AuthResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
     user: UserPublic
 
     class Config:
@@ -36,13 +35,23 @@ def hash_password(raw_password: str) -> str:
     return bcrypt.hashpw(raw_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
-def build_response(user: UserDocument) -> AuthResponse:
+def build_response(user: UserDocument) -> JSONResponse:
     token = create_access_token(user.uuid)
-    return AuthResponse(access_token=token, user=user.to_public())
+    body = AuthResponse(user=user.to_public())
+    response = JSONResponse(content=body.model_dump(), status_code=200)
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=token,
+        max_age=COOKIE_MAX_AGE,
+        httponly=True,
+        samesite="lax",
+        secure=True,
+    )
+    return response
 
 
-@router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
-async def register(payload: RegisterRequest) -> AuthResponse:
+@router.post("/register", status_code=status.HTTP_201_CREATED)
+async def register(payload: RegisterRequest):
     await ensure_db()
 
     email = payload.email.lower()
@@ -65,11 +74,13 @@ async def register(payload: RegisterRequest) -> AuthResponse:
         last_login=now,
     )
     await user.insert()
-    return build_response(user)
+    response = build_response(user)
+    response.status_code = status.HTTP_201_CREATED
+    return response
 
 
-@router.post("/login", response_model=AuthResponse)
-async def login(payload: LoginRequest) -> AuthResponse:
+@router.post("/login")
+async def login(payload: LoginRequest):
     await ensure_db()
     email = payload.email.lower()
     user = await UserDocument.find_one({"email": email})
@@ -79,6 +90,13 @@ async def login(payload: LoginRequest) -> AuthResponse:
     user.last_login = datetime.now(timezone.utc)
     await user.save()
     return build_response(user)
+
+
+@router.post("/logout")
+async def logout_route():
+    response = JSONResponse(content={"detail": "ok"})
+    response.delete_cookie(key=COOKIE_NAME, httponly=True, samesite="lax", secure=False)
+    return response
 
 
 @router.get("/me", response_model=UserPublic)

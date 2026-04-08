@@ -38,4 +38,3 @@ export const createRoom = async (payload: CreateRoomPayload): Promise<CreateRoom
     method: 'POST',
     body: JSON.stringify(payload),
   });
-

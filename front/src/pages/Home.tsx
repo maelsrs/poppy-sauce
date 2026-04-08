@@ -155,7 +155,7 @@ function HomePage() {
             tone="teal"
             icon={User}
             subIcon={<span>👤</span>}
-            onClick={() => guard(() => setShowJoin(true))}
+            onClick={() => setShowJoin(true)}
           />
         </div>
       </section>

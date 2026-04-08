@@ -3,11 +3,13 @@ import string
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+from app.core.security import get_current_user
 from app.db.client import ensure_db
 from app.models.room import GameState, PlayerInfo, RoomConfigurations, RoomDocument, RoomPrivacy
+from app.models.user import UserDocument
 
 
 router = APIRouter(prefix="/rooms", tags=["rooms"])
@@ -86,7 +88,7 @@ async def list_public_rooms() -> List[PublicRoom]:
 
 
 @router.post("", response_model=CreateRoomResponse, status_code=status.HTTP_201_CREATED)
-async def create_room(payload: CreateRoomRequest) -> CreateRoomResponse:
+async def create_room(payload: CreateRoomRequest, current_user: UserDocument = Depends(get_current_user)) -> CreateRoomResponse:
     await ensure_db()
 
     for _ in range(50):
