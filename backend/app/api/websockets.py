@@ -281,6 +281,7 @@ async def _question_timer(room_code: str, duration: int):
         from app.models.room import RoomDocument
         room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
         correct_answer = None
+        description = None
         first_pseudo = None
         if room and room.game_data.question_ids:
             idx = room.game_data.current_question_index
@@ -288,11 +289,14 @@ async def _question_timer(room_code: str, duration: int):
                 q = await _fetch_question(room.game_data.question_ids[idx])
                 if q and q.answers:
                     correct_answer = q.answers[0]
+                if q:
+                    description = q.description
         if room:
             first_pseudo = _get_first_correct_pseudo(room)
 
         await sio.emit("time_up", {
             "correct_answer": correct_answer,
+            "description": description,
             "first_pseudo": first_pseudo,
             "correct_players": _get_correct_answers_list(room) if room else [],
         }, room=room_code)
@@ -366,15 +370,19 @@ async def _check_all_answered(room_code: str):
             manager.cancel_timer(room_code)
 
             correct_answer = None
+            description = None
             if room.game_data.question_ids:
                 idx = room.game_data.current_question_index
                 if idx < len(room.game_data.question_ids):
                     q = await _fetch_question(room.game_data.question_ids[idx])
                     if q and q.answers:
                         correct_answer = q.answers[0]
+                    if q:
+                        description = q.description
 
             await sio.emit("all_answered", {
                 "correct_answer": correct_answer,
+                "description": description,
                 "first_pseudo": _get_first_correct_pseudo(room),
                 "correct_players": _get_correct_answers_list(room),
             }, room=room_code)
@@ -1072,15 +1080,19 @@ async def handle_skip_question(sid, data=None):
         manager.cancel_timer(room_code)
 
         correct_answer = None
+        description = None
         if room.game_data.question_ids:
             idx = room.game_data.current_question_index
             if idx < len(room.game_data.question_ids):
                 q = await _fetch_question(room.game_data.question_ids[idx])
                 if q and q.answers:
                     correct_answer = q.answers[0]
+                if q:
+                    description = q.description
 
         await sio.emit("all_answered", {
             "correct_answer": correct_answer,
+            "description": description,
             "first_pseudo": _get_first_correct_pseudo(room),
             "correct_players": _get_correct_answers_list(room),
         }, room=room_code)

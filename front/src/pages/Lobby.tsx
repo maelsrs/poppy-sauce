@@ -130,6 +130,7 @@ function LobbyPage() {
   const [hasAnsweredCorrectly, setHasAnsweredCorrectly] = useState(false);
   const [timeUp, setTimeUp] = useState(false);
   const [correctAnswer, setCorrectAnswer] = useState<string | null>(null);
+  const [answerDescription, setAnswerDescription] = useState<string | null>(null);
   const [lastWrongAnswer, setLastWrongAnswer] = useState<Record<string, string>>({});
   const [correctPlayersAnswers, setCorrectPlayersAnswers] = useState<Record<string, string>>({});
   const [correctPlayerUuids, setCorrectPlayerUuids] = useState<Set<string>>(new Set());
@@ -313,6 +314,7 @@ function LobbyPage() {
         setAllAnswered(false);
         setFirstPseudo(null);
         setCorrectAnswer(null);
+        setAnswerDescription(null);
         setMyAnswer('');
         setLastWrongAnswer({});
         setCorrectPlayersAnswers({});
@@ -397,6 +399,7 @@ function LobbyPage() {
 
     socket.on('all_answered', (msg) => {
       setCorrectAnswer(msg.correct_answer ?? null);
+      setAnswerDescription(msg.description ?? null);
       setFirstPseudo(msg.first_pseudo ?? null);
       setAllAnswered(true);
       const map: Record<string, string> = {};
@@ -420,6 +423,7 @@ function LobbyPage() {
       setTimeUp(true);
       setTimeLeft(0);
       setCorrectAnswer(msg.correct_answer ?? null);
+      setAnswerDescription(msg.description ?? null);
       setFirstPseudo(msg.first_pseudo ?? null);
       const map: Record<string, string> = {};
       for (const cp of msg.correct_players ?? []) map[cp.player_uuid] = cp.answer;
@@ -693,22 +697,12 @@ function LobbyPage() {
         </div>
       )}
 
-      {timeUp ? (
-        <div className="game-timeup-msg">
-          <div>Temps écoulé !{correctAnswer && <> La réponse était : <strong>{correctAnswer}</strong></>}</div>
-          <div className="game-first-pseudo">
-            {firstPseudo ? <>{firstPseudo} a répondu en premier</> : <>Personne n'a répondu</>}
-          </div>
-        </div>
-      ) : hasAnsweredCorrectly ? (
-        <div className="game-found-msg">
-          Bonne réponse !{correctAnswer ? <> C'était : <strong>{correctAnswer}</strong></> : ' En attente des autres...'}
-        </div>
-      ) : allAnswered ? (
-        <div className="game-timeup-msg">
-          <div>Question terminée !{correctAnswer && <> La réponse était : <strong>{correctAnswer}</strong></>}</div>
-          <div className="game-first-pseudo">
-            {firstPseudo ? <>{firstPseudo} a répondu en premier</> : <>Personne n'a répondu</>}
+      {(timeUp || hasAnsweredCorrectly || allAnswered) ? (
+        <div className={`game-reveal ${hasAnsweredCorrectly ? 'game-reveal--correct' : 'game-reveal--missed'}`}>
+          {correctAnswer && <div className="game-reveal__answer">{correctAnswer}</div>}
+          {answerDescription && <div className="game-reveal__description">{answerDescription}</div>}
+          <div className="game-reveal__footer">
+            {firstPseudo ? <>{firstPseudo} a trouvé en premier</> : <>Personne n'a trouvé</>}
           </div>
         </div>
       ) : (
