@@ -91,9 +91,12 @@ function AdminPage() {
   const [editRank, setEditRank] = useState("");
   const [deletingUser, setDeletingUser] = useState<UserItem | null>(null);
 
-  // Create/Edit/Delete question
+  // Create/Edit/Delete/View question
   const [showCreateQuestion, setShowCreateQuestion] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<QuestionItem | null>(
+    null,
+  );
+  const [viewingQuestion, setViewingQuestion] = useState<QuestionItem | null>(
     null,
   );
   const [deletingQuestion, setDeletingQuestion] = useState<QuestionItem | null>(
@@ -517,6 +520,15 @@ function AdminPage() {
                     <span className="admin-col admin-col--date">
                       <button
                         type="button"
+                        className="admin-action-btn admin-action-btn--icon"
+                        onClick={() => setViewingQuestion(q)}
+                        aria-label="Voir"
+                        title="Voir"
+                      >
+                        👁
+                      </button>
+                      <button
+                        type="button"
                         className="admin-action-btn"
                         onClick={() => openEditQuestion(q)}
                       >
@@ -716,6 +728,54 @@ function AdminPage() {
               disabled={saving || !qQuestion.trim() || !qAnswers.trim()}
             >
               Sauvegarder
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {viewingQuestion && (
+        <Modal
+          title={`Question #${viewingQuestion.question_id}`}
+          onClose={() => setViewingQuestion(null)}
+        >
+          <div className="question-view">
+            <div className="question-view__category">
+              {viewingQuestion.category}
+            </div>
+            <p className="question-view__question">{viewingQuestion.question}</p>
+            {viewingQuestion.image_url && (
+              <img
+                src={viewingQuestion.image_url}
+                alt=""
+                className="question-view__image"
+              />
+            )}
+            <div className="question-view__section">
+              <span className="question-view__label">Réponses</span>
+              <div className="question-view__answers">
+                {viewingQuestion.answers.map((a, i) => (
+                  <span key={i} className="question-view__answer">
+                    {a}
+                  </span>
+                ))}
+              </div>
+            </div>
+            {viewingQuestion.description && (
+              <div className="question-view__section">
+                <span className="question-view__label">Description</span>
+                <p className="question-view__description">
+                  {viewingQuestion.description}
+                </p>
+              </div>
+            )}
+          </div>
+          <div className="modal__actions">
+            <button
+              type="button"
+              className="account-card__btn account-card__btn--ghost"
+              onClick={() => setViewingQuestion(null)}
+            >
+              Fermer
             </button>
           </div>
         </Modal>
