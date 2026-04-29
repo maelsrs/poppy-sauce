@@ -742,28 +742,74 @@ function LobbyPage() {
     </div>
   );
 
-  const renderFinishedScreen = () => (
-    <div className="game-finished-screen">
-      <h2 className="finished-title">Partie terminée !</h2>
-      {winner && (
-        <div className="finished-winner">
-          {winner.pseudo} remporte la partie ({winner.rounds_won} round{winner.rounds_won > 1 ? 's' : ''} gagné{winner.rounds_won > 1 ? 's' : ''})
+  const renderFinishedScreen = () => {
+    const top3 = leaderboard.slice(0, 3);
+    const podiumOrder = [
+      top3.find((e) => e.rank === 2),
+      top3.find((e) => e.rank === 1),
+      top3.find((e) => e.rank === 3),
+    ].filter((e): e is LeaderboardEntry => Boolean(e));
+    const rest = leaderboard.slice(3);
+
+    return (
+      <div className="finished-screen">
+        <div className="finished-hero">
+          <span className="finished-hero__eyebrow">Partie terminée</span>
+          {winner ? (
+            <>
+              <h2 className="finished-hero__name">{winner.pseudo}</h2>
+              <span className="finished-hero__sub">
+                Vainqueur · {winner.rounds_won} round
+                {winner.rounds_won > 1 ? 's' : ''} gagné
+                {winner.rounds_won > 1 ? 's' : ''}
+              </span>
+            </>
+          ) : (
+            <span className="finished-hero__sub">Aucun vainqueur</span>
+          )}
         </div>
-      )}
-      <div className="podium">
-        {leaderboard.slice(0, 3).map((entry) => (
-          <div key={entry.player_uuid} className={`podium-entry podium-rank-${entry.rank}`}>
-            <div className="podium-rank">#{entry.rank}</div>
-            <div className="podium-pseudo">{entry.pseudo}</div>
-            <div className="podium-stats">
-              {entry.points} pts &middot; {entry.rounds_won} round{entry.rounds_won !== 1 ? 's' : ''}
-            </div>
+
+        {podiumOrder.length > 0 && (
+          <div className="finished-podium">
+            {podiumOrder.map((entry) => (
+              <div
+                key={entry.player_uuid}
+                className={`finished-podium__step finished-podium__step--${entry.rank}`}
+              >
+                <span className="finished-podium__rank">#{entry.rank}</span>
+                <span className="finished-podium__pseudo">{entry.pseudo}</span>
+                <div className="finished-podium__stats">
+                  <span className="finished-podium__pts">{entry.points} pts</span>
+                  <span className="finished-podium__rounds">
+                    {entry.rounds_won}R
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
+
+        {rest.length > 0 && (
+          <div className="finished-rest">
+            {rest.map((entry) => (
+              <div key={entry.player_uuid} className="finished-rest__row">
+                <span className="finished-rest__rank">#{entry.rank}</span>
+                <span className="finished-rest__pseudo">{entry.pseudo}</span>
+                <span className="finished-rest__stats">
+                  {entry.points} pts · {entry.rounds_won}R
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="finished-footer">
+          <span className="status-dot pulsing" />
+          Retour au lobby...
+        </div>
       </div>
-      <p className="finished-hint">Retour au lobby dans quelques secondes...</p>
-    </div>
-  );
+    );
+  };
 
   const renderWaitingScreen = () => (
     <>
