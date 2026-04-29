@@ -33,7 +33,7 @@ class CategoryConfig(BaseModel):
 class RoomConfigurations(BaseModel):
     score_objective: int = Field(default=100, ge=1)
     question_duration: int = Field(default=15, ge=1)
-    rounds_to_win: int = Field(default=5, ge=1)
+    rounds_to_win: int = Field(default=3, ge=1)
     show_answers: bool = Field(default=True)
     categories: List[CategoryConfig] = Field(default_factory=list)
 
