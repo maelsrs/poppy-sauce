@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import Enum
+from math import floor, sqrt
 from typing import Optional
 from uuid import uuid4
 
@@ -11,6 +12,12 @@ from pydantic import BaseModel, EmailStr, Field
 class UserRank(str, Enum):
     ADMIN = "Admin"
     USER = "User"
+
+
+def compute_level(correct_answers: int) -> int:
+    if correct_answers < 0:
+        return 1
+    return floor(sqrt(correct_answers / 5)) + 1
 
 
 class UserDocument(Document):
@@ -36,7 +43,9 @@ class UserDocument(Document):
         name = "users"
 
     def to_public(self) -> "UserPublic":
-        return UserPublic.from_orm(self)
+        public = UserPublic.from_orm(self)
+        public.level = compute_level(self.correct_answers)
+        return public
 
 
 class UserCreate(BaseModel):

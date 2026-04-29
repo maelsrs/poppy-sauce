@@ -429,6 +429,52 @@ async def _check_all_answered(room_code: str):
         print(f"[check_all_answered] erreur room {room_code}: {e}")
 
 
+async def _check_level_up(room_code: str, player_uuid: str):
+    try:
+        from app.models.room import RoomDocument
+        from app.models.user import UserDocument, compute_level
+
+        user = await UserDocument.find_one(UserDocument.uuid == player_uuid)
+        if not user:
+            return
+
+        room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
+        if not room:
+            return
+
+        in_game_correct = sum(
+            1
+            for a in room.game_data.all_answers
+            if a.player_uuid == player_uuid and a.is_correct
+        )
+        if in_game_correct == 0:
+            return
+
+        new_total = user.correct_answers + in_game_correct
+        old_level = compute_level(new_total - 1)
+        new_level = compute_level(new_total)
+        if new_level <= old_level:
+            return
+
+        player = room.find_player(player_uuid)
+        pseudo = player.pseudo if player and player.pseudo else "Un joueur"
+        await sio.emit(
+            "chat_message",
+            {
+                "player_uuid": None,
+                "pseudo": None,
+                "text": f"{pseudo} a atteint le niveau {new_level}",
+                "timestamp": _now_ms(),
+                "system": True,
+            },
+            room=room_code,
+        )
+    except asyncio.CancelledError:
+        pass
+    except Exception as e:
+        print(f"[check_level_up] erreur room {room_code}: {e}")
+
+
 async def _check_round_end(room_code: str, player_uuid: str):
     try:
         from app.models.room import GameState, RoomDocument
@@ -1004,6 +1050,7 @@ async def handle_submit_answer(sid, data=None):
     )
 
     if is_correct:
+        asyncio.create_task(_check_level_up(room_code, player_uuid))
         asyncio.create_task(_check_round_end(room_code, player_uuid))
 
 
