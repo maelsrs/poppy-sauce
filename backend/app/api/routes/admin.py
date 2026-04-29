@@ -43,6 +43,26 @@ class PaginatedQuestions(BaseModel):
     pages: int
 
 
+class CategoryStat(BaseModel):
+    name: str
+    count: int
+
+
+class QuestionStats(BaseModel):
+    total: int
+    categories: List[CategoryStat]
+
+
+class RankStat(BaseModel):
+    name: str
+    count: int
+
+
+class UserStats(BaseModel):
+    total: int
+    ranks: List[RankStat]
+
+
 class UpdateUserRequest(BaseModel):
     username: Optional[str] = Field(default=None, min_length=3, max_length=64)
     email: Optional[EmailStr] = None
@@ -79,16 +99,37 @@ def _question_to_out(q: QuestionDocument) -> QuestionOut:
     )
 
 
+@router.get("/users/stats", response_model=UserStats)
+async def admin_user_stats(
+    _admin: UserDocument = Depends(require_admin),
+):
+    pipeline = [
+        {"$group": {"_id": "$rank", "count": {"$sum": 1}}},
+        {"$sort": {"_id": 1}},
+    ]
+    rows = await UserDocument.aggregate(pipeline).to_list()
+    ranks = [RankStat(name=row["_id"], count=row["count"]) for row in rows]
+    total = sum(r.count for r in ranks)
+    return UserStats(total=total, ranks=ranks)
+
+
 @router.get("/users", response_model=PaginatedUsers)
 async def admin_list_users(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
+    rank: Optional[str] = Query(None),
     _admin: UserDocument = Depends(require_admin),
 ):
-    total = await UserDocument.count()
+    query_filter = {"rank": rank} if rank else {}
+    total = await UserDocument.find(query_filter).count()
     pages = max(1, ceil(total / per_page))
     skip = (page - 1) * per_page
-    users = await UserDocument.find_all().skip(skip).limit(per_page).to_list()
+    users = (
+        await UserDocument.find(query_filter)
+        .skip(skip)
+        .limit(per_page)
+        .to_list()
+    )
     return PaginatedUsers(
         items=[u.to_public() for u in users],
         total=total,
@@ -98,12 +139,18 @@ async def admin_list_users(
     )
 
 
-@router.get("/questions/categories", response_model=List[str])
-async def admin_list_categories(
+@router.get("/questions/stats", response_model=QuestionStats)
+async def admin_question_stats(
     _admin: UserDocument = Depends(require_admin),
 ):
-    categories = await QuestionDocument.distinct("category")
-    return sorted(categories)
+    pipeline = [
+        {"$group": {"_id": "$category", "count": {"$sum": 1}}},
+        {"$sort": {"_id": 1}},
+    ]
+    rows = await QuestionDocument.aggregate(pipeline).to_list()
+    categories = [CategoryStat(name=row["_id"], count=row["count"]) for row in rows]
+    total = sum(c.count for c in categories)
+    return QuestionStats(total=total, categories=categories)
 
 
 @router.get("/questions", response_model=PaginatedQuestions)
@@ -113,16 +160,18 @@ async def admin_list_questions(
     category: Optional[str] = Query(None),
     _admin: UserDocument = Depends(require_admin),
 ):
-    query = QuestionDocument.find({"category": category}) if category else QuestionDocument.find_all()
-    total = await query.count()
+    query_filter = {"category": category} if category else {}
+    total = await QuestionDocument.find(query_filter).count()
     pages = max(1, ceil(total / per_page))
     skip = (page - 1) * per_page
-    questions = await QuestionDocument.find({"category": category}).skip(skip).limit(per_page).to_list() if category else await QuestionDocument.find_all().skip(skip).limit(per_page).to_list()
+    questions = (
+        await QuestionDocument.find(query_filter)
+        .skip(skip)
+        .limit(per_page)
+        .to_list()
+    )
     return PaginatedQuestions(
-        items=[
-            _question_to_out(q)
-            for q in questions
-        ],
+        items=[_question_to_out(q) for q in questions],
         total=total,
         page=page,
         per_page=per_page,

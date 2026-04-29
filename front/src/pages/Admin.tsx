@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../auth/AuthContext';
-import { request } from '../services/auth';
-import { Field, Modal } from '../components/ui';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
+import { request } from "../services/auth";
+import { Field, Modal } from "../components/ui";
 
 type UserItem = {
   uuid: string;
@@ -46,68 +46,128 @@ type PaginatedQuestions = {
   pages: number;
 };
 
-type Tab = 'users' | 'questions';
+type CategoryStat = {
+  name: string;
+  count: number;
+};
+
+type QuestionStats = {
+  total: number;
+  categories: CategoryStat[];
+};
+
+type RankStat = {
+  name: string;
+  count: number;
+};
+
+type UserStats = {
+  total: number;
+  ranks: RankStat[];
+};
+
+type Tab = "users" | "questions";
 
 function AdminPage() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
 
-  const [tab, setTab] = useState<Tab>('users');
+  const [tab, setTab] = useState<Tab>("users");
   const [usersData, setUsersData] = useState<PaginatedUsers | null>(null);
-  const [questionsData, setQuestionsData] = useState<PaginatedQuestions | null>(null);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [questionsData, setQuestionsData] = useState<PaginatedQuestions | null>(
+    null,
+  );
+  const [stats, setStats] = useState<QuestionStats | null>(null);
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedRank, setSelectedRank] = useState<string | null>(null);
   const [userPage, setUserPage] = useState(1);
   const [questionPage, setQuestionPage] = useState(1);
   const [loading, setLoading] = useState(false);
 
   // Edit/Delete user
   const [editingUser, setEditingUser] = useState<UserItem | null>(null);
-  const [editUsername, setEditUsername] = useState('');
-  const [editRank, setEditRank] = useState('');
+  const [editUsername, setEditUsername] = useState("");
+  const [editRank, setEditRank] = useState("");
   const [deletingUser, setDeletingUser] = useState<UserItem | null>(null);
 
   // Create/Edit/Delete question
   const [showCreateQuestion, setShowCreateQuestion] = useState(false);
-  const [editingQuestion, setEditingQuestion] = useState<QuestionItem | null>(null);
-  const [deletingQuestion, setDeletingQuestion] = useState<QuestionItem | null>(null);
-  const [qQuestion, setQQuestion] = useState('');
-  const [qAnswers, setQAnswers] = useState('');
-  const [qCategory, setQCategory] = useState('');
-  const [qDescription, setQDescription] = useState('');
-  const [qImageUrl, setQImageUrl] = useState('');
+  const [editingQuestion, setEditingQuestion] = useState<QuestionItem | null>(
+    null,
+  );
+  const [deletingQuestion, setDeletingQuestion] = useState<QuestionItem | null>(
+    null,
+  );
+  const [qQuestion, setQQuestion] = useState("");
+  const [qAnswers, setQAnswers] = useState("");
+  const [qCategory, setQCategory] = useState("");
+  const [qDescription, setQDescription] = useState("");
+  const [qImageUrl, setQImageUrl] = useState("");
 
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && (!user || user.rank !== 'Admin')) {
-      navigate('/');
+    if (!authLoading && (!user || user.rank !== "Admin")) {
+      navigate("/");
     }
   }, [authLoading, user, navigate]);
 
   const loadUsers = () => {
-    if (!user || user.rank !== 'Admin') return;
+    if (!user || user.rank !== "Admin") return;
     setLoading(true);
-    request<PaginatedUsers>(`/admin/users?page=${userPage}&per_page=20`)
+    const rankParam = selectedRank
+      ? `&rank=${encodeURIComponent(selectedRank)}`
+      : "";
+    request<PaginatedUsers>(
+      `/admin/users?page=${userPage}&per_page=20${rankParam}`,
+    )
       .then(setUsersData)
       .finally(() => setLoading(false));
   };
 
+  const loadUserStats = () => {
+    if (!user || user.rank !== "Admin") return;
+    request<UserStats>("/admin/users/stats").then(setUserStats);
+  };
+
   const loadQuestions = () => {
-    if (!user || user.rank !== 'Admin') return;
+    if (!user || user.rank !== "Admin") return;
     setLoading(true);
-    const catParam = selectedCategory ? `&category=${encodeURIComponent(selectedCategory)}` : '';
-    request<PaginatedQuestions>(`/admin/questions?page=${questionPage}&per_page=20${catParam}`)
+    const catParam = selectedCategory
+      ? `&category=${encodeURIComponent(selectedCategory)}`
+      : "";
+    request<PaginatedQuestions>(
+      `/admin/questions?page=${questionPage}&per_page=20${catParam}`,
+    )
       .then(setQuestionsData)
       .finally(() => setLoading(false));
   };
 
-  useEffect(loadUsers, [userPage, user]);
+  const loadStats = () => {
+    if (!user || user.rank !== "Admin") return;
+    request<QuestionStats>("/admin/questions/stats").then(setStats);
+  };
+
   useEffect(() => {
-    if (!user || user.rank !== 'Admin') return;
-    request<string[]>('/admin/questions/categories').then(setCategories);
-  }, [user]);
-  useEffect(loadQuestions, [questionPage, selectedCategory, user]);
+    if (tab !== "users") return;
+    loadUsers();
+  }, [tab, userPage, selectedRank, user]);
+
+  useEffect(() => {
+    if (tab !== "users") return;
+    loadUserStats();
+  }, [tab, user]);
+
+  useEffect(() => {
+    if (tab !== "questions") return;
+    loadStats();
+  }, [tab, user]);
+
+  useEffect(() => {
+    if (tab !== "questions") return;
+    loadQuestions();
+  }, [tab, questionPage, selectedCategory, user]);
 
   const openEditUser = (u: UserItem) => {
     setEditingUser(u);
@@ -120,11 +180,12 @@ function AdminPage() {
     setSaving(true);
     try {
       await request(`/admin/users/${editingUser.uuid}`, {
-        method: 'PUT',
+        method: "PUT",
         body: JSON.stringify({ username: editUsername, rank: editRank }),
       });
       setEditingUser(null);
       loadUsers();
+      loadUserStats();
     } finally {
       setSaving(false);
     }
@@ -134,48 +195,52 @@ function AdminPage() {
     if (!deletingUser) return;
     setSaving(true);
     try {
-      await request(`/admin/users/${deletingUser.uuid}`, { method: 'DELETE' });
+      await request(`/admin/users/${deletingUser.uuid}`, { method: "DELETE" });
       setDeletingUser(null);
       loadUsers();
+      loadUserStats();
     } finally {
       setSaving(false);
     }
   };
 
   const openCreateQuestion = () => {
-    setQQuestion('');
-    setQAnswers('');
-    setQCategory('Grand public');
-    setQDescription('');
-    setQImageUrl('');
+    setQQuestion("");
+    setQAnswers("");
+    setQCategory("Grand public");
+    setQDescription("");
+    setQImageUrl("");
     setShowCreateQuestion(true);
   };
 
   const openEditQuestion = (q: QuestionItem) => {
     setEditingQuestion(q);
     setQQuestion(q.question);
-    setQAnswers(q.answers.join(', '));
+    setQAnswers(q.answers.join(", "));
     setQCategory(q.category);
-    setQDescription(q.description ?? '');
-    setQImageUrl(q.image_url ?? '');
+    setQDescription(q.description ?? "");
+    setQImageUrl(q.image_url ?? "");
   };
 
   const saveNewQuestion = async () => {
     setSaving(true);
     try {
-      await request('/admin/questions', {
-        method: 'POST',
+      await request("/admin/questions", {
+        method: "POST",
         body: JSON.stringify({
           question: qQuestion,
-          answers: qAnswers.split(',').map((a) => a.trim()).filter(Boolean),
-          category: qCategory || 'Grand public',
+          answers: qAnswers
+            .split(",")
+            .map((a) => a.trim())
+            .filter(Boolean),
+          category: qCategory || "Grand public",
           description: qDescription || null,
           image_url: qImageUrl || null,
         }),
       });
       setShowCreateQuestion(false);
       loadQuestions();
-      request<string[]>('/admin/questions/categories').then(setCategories);
+      loadStats();
     } finally {
       setSaving(false);
     }
@@ -186,18 +251,21 @@ function AdminPage() {
     setSaving(true);
     try {
       await request(`/admin/questions/${editingQuestion.question_id}`, {
-        method: 'PUT',
+        method: "PUT",
         body: JSON.stringify({
           question: qQuestion,
-          answers: qAnswers.split(',').map((a) => a.trim()).filter(Boolean),
-          category: qCategory || 'Grand public',
+          answers: qAnswers
+            .split(",")
+            .map((a) => a.trim())
+            .filter(Boolean),
+          category: qCategory || "Grand public",
           description: qDescription || null,
           image_url: qImageUrl || null,
         }),
       });
       setEditingQuestion(null);
       loadQuestions();
-      request<string[]>('/admin/questions/categories').then(setCategories);
+      loadStats();
     } finally {
       setSaving(false);
     }
@@ -207,15 +275,18 @@ function AdminPage() {
     if (!deletingQuestion) return;
     setSaving(true);
     try {
-      await request(`/admin/questions/${deletingQuestion.question_id}`, { method: 'DELETE' });
+      await request(`/admin/questions/${deletingQuestion.question_id}`, {
+        method: "DELETE",
+      });
       setDeletingQuestion(null);
       loadQuestions();
+      loadStats();
     } finally {
       setSaving(false);
     }
   };
 
-  if (authLoading || !user || user.rank !== 'Admin') return null;
+  if (authLoading || !user || user.rank !== "Admin") return null;
 
   return (
     <div className="layout">
@@ -227,65 +298,124 @@ function AdminPage() {
           <div className="admin-tabs">
             <button
               type="button"
-              className={`admin-tab ${tab === 'users' ? 'is-active' : ''}`}
-              onClick={() => setTab('users')}
+              className={`admin-tab ${tab === "users" ? "is-active" : ""}`}
+              onClick={() => setTab("users")}
             >
               Utilisateurs
             </button>
             <button
               type="button"
-              className={`admin-tab ${tab === 'questions' ? 'is-active' : ''}`}
-              onClick={() => setTab('questions')}
+              className={`admin-tab ${tab === "questions" ? "is-active" : ""}`}
+              onClick={() => setTab("questions")}
             >
               Questions
             </button>
           </div>
         </div>
 
-        {tab === 'questions' && (
+        {tab === "questions" && (
           <div className="admin-categories">
             <p className="admin-categories__label">Catégories</p>
             <div className="admin-category-list">
               <button
                 type="button"
-                className={`admin-category-item ${selectedCategory === null ? 'is-active' : ''}`}
-                onClick={() => { setSelectedCategory(null); setQuestionPage(1); }}
+                className={`admin-category-item ${selectedCategory === null ? "is-active" : ""}`}
+                onClick={() => {
+                  setSelectedCategory(null);
+                  setQuestionPage(1);
+                }}
               >
-                Toutes
+                <span>Toutes</span>
+                {stats && (
+                  <span className="admin-category-count">{stats.total}</span>
+                )}
               </button>
-              {categories.map((cat) => (
+              {stats?.categories.map((cat) => (
                 <button
-                  key={cat}
+                  key={cat.name}
                   type="button"
-                  className={`admin-category-item ${selectedCategory === cat ? 'is-active' : ''}`}
-                  onClick={() => { setSelectedCategory(cat); setQuestionPage(1); }}
+                  className={`admin-category-item ${selectedCategory === cat.name ? "is-active" : ""}`}
+                  onClick={() => {
+                    setSelectedCategory(cat.name);
+                    setQuestionPage(1);
+                  }}
                 >
-                  {cat}
+                  <span>{cat.name}</span>
+                  <span className="admin-category-count">{cat.count}</span>
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        {tab === 'users' && usersData && (
-          <div className="admin-stats-card">
-            <div className="stat-row">
-              <span className="stat-row__label">Total utilisateurs</span>
-              <span className="stat-row__value">{usersData.total}</span>
+        {tab === "users" && (
+          <div className="admin-categories">
+            <p className="admin-categories__label">Rangs</p>
+            <div className="admin-category-list">
+              <button
+                type="button"
+                className={`admin-category-item ${selectedRank === null ? "is-active" : ""}`}
+                onClick={() => {
+                  setSelectedRank(null);
+                  setUserPage(1);
+                }}
+              >
+                <span>Tous</span>
+                {userStats && (
+                  <span className="admin-category-count">
+                    {userStats.total}
+                  </span>
+                )}
+              </button>
+              {userStats?.ranks.map((r) => (
+                <button
+                  key={r.name}
+                  type="button"
+                  className={`admin-category-item ${selectedRank === r.name ? "is-active" : ""}`}
+                  onClick={() => {
+                    setSelectedRank(r.name);
+                    setUserPage(1);
+                  }}
+                >
+                  <span>{r.name}</span>
+                  <span className="admin-category-count">{r.count}</span>
+                </button>
+              ))}
             </div>
           </div>
         )}
 
-        {tab === 'questions' && questionsData && (
+        {tab === "users" && userStats && (
+          <div className="admin-stats-card">
+            <div className="stat-row">
+              <span className="stat-row__label">Total utilisateurs</span>
+              <span className="stat-row__value">{userStats.total}</span>
+            </div>
+            {selectedRank && usersData && (
+              <div className="stat-row">
+                <span className="stat-row__label">Filtrés</span>
+                <span className="stat-row__value">{usersData.total}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === "questions" && stats && (
           <div className="admin-stats-card">
             <div className="stat-row">
               <span className="stat-row__label">Total questions</span>
-              <span className="stat-row__value">{questionsData.total}</span>
+              <span className="stat-row__value">{stats.total}</span>
             </div>
             <div className="stat-row">
               <span className="stat-row__label">Catégories</span>
-              <span className="stat-row__value">{categories.length}</span>
+              <span className="stat-row__value">{stats.categories.length}</span>
             </div>
+            {selectedCategory && questionsData && (
+              <div className="stat-row">
+                <span className="stat-row__label">Filtrées</span>
+                <span className="stat-row__value">{questionsData.total}</span>
+              </div>
+            )}
           </div>
         )}
       </section>
@@ -294,21 +424,25 @@ function AdminPage() {
         <div className="admin-list-card">
           <div className="admin-list-header">
             <h3 className="admin-list-header__title">
-              {tab === 'users' ? 'Utilisateurs' : 'Questions'}
+              {tab === "users" ? "Utilisateurs" : "Questions"}
             </h3>
-            {tab === 'questions' && (
-              <button type="button" className="public__create" onClick={openCreateQuestion}>
+            {tab === "questions" && (
+              <button
+                type="button"
+                className="public__create"
+                onClick={openCreateQuestion}
+              >
                 Ajouter
               </button>
             )}
-            {tab === 'questions' && selectedCategory && (
+            {tab === "questions" && selectedCategory && (
               <span className="admin-filter-badge">{selectedCategory}</span>
             )}
           </div>
 
           {loading ? (
             <div className="admin-loading">Chargement...</div>
-          ) : tab === 'users' && usersData ? (
+          ) : tab === "users" && usersData ? (
             <>
               <div className="admin-table">
                 <div className="admin-table__head">
@@ -319,14 +453,32 @@ function AdminPage() {
                 </div>
                 {usersData.items.map((u) => (
                   <div key={u.uuid} className="admin-table__row">
-                    <span className="admin-col admin-col--name">{u.username}</span>
-                    <span className={`admin-col admin-col--rank ${u.rank === 'Admin' ? 'admin-rank--admin' : ''}`}>
+                    <span className="admin-col admin-col--name">
+                      {u.username}
+                    </span>
+                    <span
+                      className={`admin-col admin-col--rank ${u.rank === "Admin" ? "admin-rank--admin" : ""}`}
+                    >
                       {u.rank}
                     </span>
-                    <span className="admin-col admin-col--level">{u.games_played}</span>
+                    <span className="admin-col admin-col--level">
+                      {u.games_played}
+                    </span>
                     <span className="admin-col admin-col--date">
-                      <button type="button" className="admin-action-btn" onClick={() => openEditUser(u)}>Modifier</button>
-                      <button type="button" className="admin-action-btn admin-action-btn--danger" onClick={() => setDeletingUser(u)}>Supprimer</button>
+                      <button
+                        type="button"
+                        className="admin-action-btn"
+                        onClick={() => openEditUser(u)}
+                      >
+                        Modifier
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-action-btn admin-action-btn--danger"
+                        onClick={() => setDeletingUser(u)}
+                      >
+                        Supprimer
+                      </button>
                     </span>
                   </div>
                 ))}
@@ -334,25 +486,49 @@ function AdminPage() {
                   <div className="admin-empty">Aucun utilisateur.</div>
                 )}
               </div>
-              <Pagination page={usersData.page} pages={usersData.pages} onChange={setUserPage} />
+              <Pagination
+                page={usersData.page}
+                pages={usersData.pages}
+                onChange={setUserPage}
+              />
             </>
-          ) : tab === 'questions' && questionsData ? (
+          ) : tab === "questions" && questionsData ? (
             <>
               <div className="admin-table">
                 <div className="admin-table__head">
                   <span className="admin-col admin-col--id">#</span>
-                  <span className="admin-col admin-col--question">Question</span>
+                  <span className="admin-col admin-col--question">
+                    Question
+                  </span>
                   <span className="admin-col admin-col--cat">Catégorie</span>
                   <span className="admin-col admin-col--date">Actions</span>
                 </div>
                 {questionsData.items.map((q) => (
                   <div key={q.question_id} className="admin-table__row">
-                    <span className="admin-col admin-col--id">{q.question_id}</span>
-                    <span className="admin-col admin-col--question">{q.question}</span>
-                    <span className="admin-col admin-col--cat">{q.category}</span>
+                    <span className="admin-col admin-col--id">
+                      {q.question_id}
+                    </span>
+                    <span className="admin-col admin-col--question">
+                      {q.question}
+                    </span>
+                    <span className="admin-col admin-col--cat">
+                      {q.category}
+                    </span>
                     <span className="admin-col admin-col--date">
-                      <button type="button" className="admin-action-btn" onClick={() => openEditQuestion(q)}>Modifier</button>
-                      <button type="button" className="admin-action-btn admin-action-btn--danger" onClick={() => setDeletingQuestion(q)}>Supprimer</button>
+                      <button
+                        type="button"
+                        className="admin-action-btn"
+                        onClick={() => openEditQuestion(q)}
+                      >
+                        Modifier
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-action-btn admin-action-btn--danger"
+                        onClick={() => setDeletingQuestion(q)}
+                      >
+                        Supprimer
+                      </button>
                     </span>
                   </div>
                 ))}
@@ -360,73 +536,217 @@ function AdminPage() {
                   <div className="admin-empty">Aucune question.</div>
                 )}
               </div>
-              <Pagination page={questionsData.page} pages={questionsData.pages} onChange={setQuestionPage} />
+              <Pagination
+                page={questionsData.page}
+                pages={questionsData.pages}
+                onChange={setQuestionPage}
+              />
             </>
           ) : null}
         </div>
       </section>
 
       {editingUser && (
-        <Modal title={`Modifier ${editingUser.username}`} onClose={() => setEditingUser(null)}>
-          <Field label="Pseudo" value={editUsername} onChange={setEditUsername} />
+        <Modal
+          title={`Modifier ${editingUser.username}`}
+          onClose={() => setEditingUser(null)}
+        >
+          <Field
+            label="Pseudo"
+            value={editUsername}
+            onChange={setEditUsername}
+          />
           <div className="field">
             <span className="field__label">Rang</span>
             <div className="account-tabs">
-              <button type="button" className={`account-tab ${editRank === 'User' ? 'is-active' : ''}`} onClick={() => setEditRank('User')}>User</button>
-              <button type="button" className={`account-tab ${editRank === 'Admin' ? 'is-active' : ''}`} onClick={() => setEditRank('Admin')}>Admin</button>
+              <button
+                type="button"
+                className={`account-tab ${editRank === "User" ? "is-active" : ""}`}
+                onClick={() => setEditRank("User")}
+              >
+                User
+              </button>
+              <button
+                type="button"
+                className={`account-tab ${editRank === "Admin" ? "is-active" : ""}`}
+                onClick={() => setEditRank("Admin")}
+              >
+                Admin
+              </button>
             </div>
           </div>
           <div className="modal__actions">
-            <button type="button" className="account-card__btn account-card__btn--ghost" onClick={() => setEditingUser(null)}>Annuler</button>
-            <button type="button" className="account-card__btn account-card__btn--primary" onClick={saveUser} disabled={saving}>Sauvegarder</button>
+            <button
+              type="button"
+              className="account-card__btn account-card__btn--ghost"
+              onClick={() => setEditingUser(null)}
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              className="account-card__btn account-card__btn--primary"
+              onClick={saveUser}
+              disabled={saving}
+            >
+              Sauvegarder
+            </button>
           </div>
         </Modal>
       )}
 
       {deletingUser && (
-        <Modal title="Supprimer un utilisateur" onClose={() => setDeletingUser(null)}>
-          <p>Supprimer <strong>{deletingUser.username}</strong> ? Cette action est irréversible.</p>
+        <Modal
+          title="Supprimer un utilisateur"
+          onClose={() => setDeletingUser(null)}
+        >
+          <p>
+            Supprimer <strong>{deletingUser.username}</strong> ? Cette action
+            est irréversible.
+          </p>
           <div className="modal__actions">
-            <button type="button" className="account-card__btn account-card__btn--ghost" onClick={() => setDeletingUser(null)}>Annuler</button>
-            <button type="button" className="account-card__btn account-card__btn--primary" onClick={confirmDeleteUser} disabled={saving}>Confirmer</button>
+            <button
+              type="button"
+              className="account-card__btn account-card__btn--ghost"
+              onClick={() => setDeletingUser(null)}
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              className="account-card__btn account-card__btn--primary"
+              onClick={confirmDeleteUser}
+              disabled={saving}
+            >
+              Confirmer
+            </button>
           </div>
         </Modal>
       )}
 
       {showCreateQuestion && (
-        <Modal title="Ajouter une question" onClose={() => setShowCreateQuestion(false)}>
-          <Field label="Question" value={qQuestion} onChange={setQQuestion} placeholder="Quelle est la capitale..." />
-          <Field label="Réponses (séparées par des virgules)" value={qAnswers} onChange={setQAnswers} placeholder="Paris, paris" />
-          <Field label="Catégorie" value={qCategory} onChange={setQCategory} placeholder="Grand public" />
-          <Field label="Description (optionnel)" value={qDescription} onChange={setQDescription} placeholder="" />
-          <Field label="URL image (optionnel)" value={qImageUrl} onChange={setQImageUrl} placeholder="https://..." />
+        <Modal
+          title="Ajouter une question"
+          onClose={() => setShowCreateQuestion(false)}
+        >
+          <Field
+            label="Question"
+            value={qQuestion}
+            onChange={setQQuestion}
+            placeholder="Quelle est la capitale..."
+          />
+          <Field
+            label="Réponses (séparées par des virgules)"
+            value={qAnswers}
+            onChange={setQAnswers}
+            placeholder="Paris, paris"
+          />
+          <Field
+            label="Catégorie"
+            value={qCategory}
+            onChange={setQCategory}
+            placeholder="Grand public"
+          />
+          <Field
+            label="Description (optionnel)"
+            value={qDescription}
+            onChange={setQDescription}
+            placeholder=""
+          />
+          <Field
+            label="URL image (optionnel)"
+            value={qImageUrl}
+            onChange={setQImageUrl}
+            placeholder="https://..."
+          />
           <div className="modal__actions">
-            <button type="button" className="account-card__btn account-card__btn--ghost" onClick={() => setShowCreateQuestion(false)}>Annuler</button>
-            <button type="button" className="account-card__btn account-card__btn--primary" onClick={saveNewQuestion} disabled={saving || !qQuestion.trim() || !qAnswers.trim()}>Ajouter</button>
+            <button
+              type="button"
+              className="account-card__btn account-card__btn--ghost"
+              onClick={() => setShowCreateQuestion(false)}
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              className="account-card__btn account-card__btn--primary"
+              onClick={saveNewQuestion}
+              disabled={saving || !qQuestion.trim() || !qAnswers.trim()}
+            >
+              Ajouter
+            </button>
           </div>
         </Modal>
       )}
 
       {editingQuestion && (
-        <Modal title={`Modifier question #${editingQuestion.question_id}`} onClose={() => setEditingQuestion(null)}>
+        <Modal
+          title={`Modifier question #${editingQuestion.question_id}`}
+          onClose={() => setEditingQuestion(null)}
+        >
           <Field label="Question" value={qQuestion} onChange={setQQuestion} />
-          <Field label="Réponses (séparées par des virgules)" value={qAnswers} onChange={setQAnswers} />
+          <Field
+            label="Réponses (séparées par des virgules)"
+            value={qAnswers}
+            onChange={setQAnswers}
+          />
           <Field label="Catégorie" value={qCategory} onChange={setQCategory} />
-          <Field label="Description (optionnel)" value={qDescription} onChange={setQDescription} />
-          <Field label="URL image (optionnel)" value={qImageUrl} onChange={setQImageUrl} />
+          <Field
+            label="Description (optionnel)"
+            value={qDescription}
+            onChange={setQDescription}
+          />
+          <Field
+            label="URL image (optionnel)"
+            value={qImageUrl}
+            onChange={setQImageUrl}
+          />
           <div className="modal__actions">
-            <button type="button" className="account-card__btn account-card__btn--ghost" onClick={() => setEditingQuestion(null)}>Annuler</button>
-            <button type="button" className="account-card__btn account-card__btn--primary" onClick={saveEditQuestion} disabled={saving || !qQuestion.trim() || !qAnswers.trim()}>Sauvegarder</button>
+            <button
+              type="button"
+              className="account-card__btn account-card__btn--ghost"
+              onClick={() => setEditingQuestion(null)}
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              className="account-card__btn account-card__btn--primary"
+              onClick={saveEditQuestion}
+              disabled={saving || !qQuestion.trim() || !qAnswers.trim()}
+            >
+              Sauvegarder
+            </button>
           </div>
         </Modal>
       )}
 
       {deletingQuestion && (
-        <Modal title="Supprimer une question" onClose={() => setDeletingQuestion(null)}>
-          <p>Supprimer la question <strong>#{deletingQuestion.question_id}</strong> ? Cette action est irréversible.</p>
+        <Modal
+          title="Supprimer une question"
+          onClose={() => setDeletingQuestion(null)}
+        >
+          <p>
+            Supprimer la question{" "}
+            <strong>#{deletingQuestion.question_id}</strong> ? Cette action est
+            irréversible.
+          </p>
           <div className="modal__actions">
-            <button type="button" className="account-card__btn account-card__btn--ghost" onClick={() => setDeletingQuestion(null)}>Annuler</button>
-            <button type="button" className="account-card__btn account-card__btn--primary" onClick={confirmDeleteQuestion} disabled={saving}>Confirmer</button>
+            <button
+              type="button"
+              className="account-card__btn account-card__btn--ghost"
+              onClick={() => setDeletingQuestion(null)}
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              className="account-card__btn account-card__btn--primary"
+              onClick={confirmDeleteQuestion}
+              disabled={saving}
+            >
+              Confirmer
+            </button>
           </div>
         </Modal>
       )}
@@ -434,29 +754,60 @@ function AdminPage() {
   );
 }
 
-function Pagination({ page, pages, onChange }: { page: number; pages: number; onChange: (p: number) => void }) {
+function Pagination({
+  page,
+  pages,
+  onChange,
+}: {
+  page: number;
+  pages: number;
+  onChange: (p: number) => void;
+}) {
   if (pages <= 1) return null;
 
-  const items: (number | '...')[] = [];
+  const items: (number | "...")[] = [];
   for (let i = 1; i <= pages; i++) {
     if (i === 1 || i === pages || (i >= page - 1 && i <= page + 1)) {
       items.push(i);
-    } else if (items[items.length - 1] !== '...') {
-      items.push('...');
+    } else if (items[items.length - 1] !== "...") {
+      items.push("...");
     }
   }
 
   return (
     <div className="admin-pagination">
-      <button type="button" className="admin-page-btn" disabled={page <= 1} onClick={() => onChange(page - 1)}>&laquo;</button>
+      <button
+        type="button"
+        className="admin-page-btn"
+        disabled={page <= 1}
+        onClick={() => onChange(page - 1)}
+      >
+        &laquo;
+      </button>
       {items.map((item, idx) =>
-        item === '...' ? (
-          <span key={`e${idx}`} className="admin-page-ellipsis">...</span>
+        item === "..." ? (
+          <span key={`e${idx}`} className="admin-page-ellipsis">
+            ...
+          </span>
         ) : (
-          <button key={item} type="button" className={`admin-page-btn ${item === page ? 'is-active' : ''}`} onClick={() => onChange(item)}>{item}</button>
+          <button
+            key={item}
+            type="button"
+            className={`admin-page-btn ${item === page ? "is-active" : ""}`}
+            onClick={() => onChange(item)}
+          >
+            {item}
+          </button>
         ),
       )}
-      <button type="button" className="admin-page-btn" disabled={page >= pages} onClick={() => onChange(page + 1)}>&raquo;</button>
+      <button
+        type="button"
+        className="admin-page-btn"
+        disabled={page >= pages}
+        onClick={() => onChange(page + 1)}
+      >
+        &raquo;
+      </button>
     </div>
   );
 }

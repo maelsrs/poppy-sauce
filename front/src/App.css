@@ -1904,6 +1904,26 @@
   cursor: pointer;
   text-align: left;
   transition: background 0.15s ease, color 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admin-category-count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.12);
+  padding: 2px 8px;
+  border-radius: 999px;
+  min-width: 28px;
+  text-align: center;
+}
+
+.admin-category-item.is-active .admin-category-count {
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
 }
 
 .admin-category-item:hover {
