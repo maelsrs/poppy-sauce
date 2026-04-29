@@ -46,7 +46,7 @@ Les images sont publiées sur GHCR à chaque push sur `main` par GitHub Actions 
 `ghcr.io/maelsrs/poppy-back:latest` et `ghcr.io/maelsrs/poppy-front:latest`. [Watchtower](https://github.com/containrrr/watchtower) est utilisé pour pull automatiquement.
 
 > [!IMPORTANT]
-> Les ~10 000 questions ne sont pas versionnées dans le repo : elles ont été scrapées (sans autorisation 🙊) depuis [jklm.fun](https://jklm.fun/) et vous devez importer manuellement dans la base avant de lancer une partie. Beanie crée automatiquement les index Mongo au premier démarrage, mais si la collection `questions` est vide, `$sample` renverra zéro résultat.
+> Les ~10 000 questions ne sont pas versionnées dans le repo : elles ont été scrapées (sans autorisation 🙊) depuis [jklm.fun](https://jklm.fun/) et vous devez en importer manuellement dans la base avant de lancer une partie. Beanie crée automatiquement les index Mongo au premier démarrage, mais si la collection `questions` est vide, `$sample` renverra zéro résultat.
 
 Chaque document de la collection `questions` suit ce format :
 
