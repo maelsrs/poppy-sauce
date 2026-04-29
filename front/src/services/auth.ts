@@ -84,9 +84,11 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
       throw err;
     }
 
-    const data = (await response.json()) as T;
     console.info(`[api] ${method} ${path} -> ${response.status}`);
-    return data;
+    if (response.status === 204 || response.headers.get('content-length') === '0') {
+      return undefined as T;
+    }
+    return (await response.json()) as T;
   } catch (error) {
     console.error(`[api] ${method} ${path} failed`, error);
     throw error;
