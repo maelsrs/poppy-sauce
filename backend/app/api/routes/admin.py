@@ -107,7 +107,8 @@ async def admin_user_stats(
         {"$group": {"_id": "$rank", "count": {"$sum": 1}}},
         {"$sort": {"_id": 1}},
     ]
-    rows = await UserDocument.aggregate(pipeline).to_list()
+    cursor = UserDocument.get_motor_collection().aggregate(pipeline)
+    rows = await cursor.to_list(length=None)
     ranks = [RankStat(name=row["_id"], count=row["count"]) for row in rows]
     total = sum(r.count for r in ranks)
     return UserStats(total=total, ranks=ranks)
@@ -120,8 +121,12 @@ async def admin_list_users(
     rank: Optional[str] = Query(None),
     _admin: UserDocument = Depends(require_admin),
 ):
-    query_filter = {"rank": rank} if rank else {}
-    total = await UserDocument.find(query_filter).count()
+    if rank:
+        query_filter = {"rank": rank}
+        total = await UserDocument.find(query_filter).count()
+    else:
+        query_filter = {}
+        total = await UserDocument.get_motor_collection().estimated_document_count()
     pages = max(1, ceil(total / per_page))
     skip = (page - 1) * per_page
     users = (
@@ -147,8 +152,11 @@ async def admin_question_stats(
         {"$group": {"_id": "$category", "count": {"$sum": 1}}},
         {"$sort": {"_id": 1}},
     ]
-    rows = await QuestionDocument.aggregate(pipeline).to_list()
-    categories = [CategoryStat(name=row["_id"], count=row["count"]) for row in rows]
+    cursor = QuestionDocument.get_motor_collection().aggregate(pipeline)
+    rows = await cursor.to_list(length=None)
+    categories = [
+        CategoryStat(name=row["_id"], count=row["count"]) for row in rows
+    ]
     total = sum(c.count for c in categories)
     return QuestionStats(total=total, categories=categories)
 
@@ -160,8 +168,12 @@ async def admin_list_questions(
     category: Optional[str] = Query(None),
     _admin: UserDocument = Depends(require_admin),
 ):
-    query_filter = {"category": category} if category else {}
-    total = await QuestionDocument.find(query_filter).count()
+    if category:
+        query_filter = {"category": category}
+        total = await QuestionDocument.find(query_filter).count()
+    else:
+        query_filter = {}
+        total = await QuestionDocument.get_motor_collection().estimated_document_count()
     pages = max(1, ceil(total / per_page))
     skip = (page - 1) * per_page
     questions = (

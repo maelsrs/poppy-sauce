@@ -2,6 +2,7 @@ from enum import Enum
 from typing import List, Optional
 
 from beanie import Document, Insert, before_event
+from beanie.odm.fields import Indexed
 from pydantic import Field
 from pymongo import ReturnDocument
 
@@ -13,11 +14,11 @@ class QuestionType(str, Enum):
 
 
 class QuestionDocument(Document):
-    question_id: int = Field(default=None, index=True, unique=True)
+    question_id: Indexed(int, unique=True) = Field(default=None)
     question_type: QuestionType = Field(default=QuestionType.TEXT)
-    category: str = Field(default="Grand public", index=True)
-    question: str = Field(...,)
-    answers: List[str] = Field(default_factory=list,)
+    category: Indexed(str) = Field(default="Grand public")
+    question: str = Field(...)
+    answers: List[str] = Field(default_factory=list)
     description: Optional[str] = Field(default=None)
     image_url: Optional[str] = Field(default=None)
 
