@@ -10,7 +10,6 @@ from pymongo import ReturnDocument
 class QuestionType(str, Enum):
     TEXT = "text"
     IMAGE = "image"
-    MIXED = "mixed"
 
 
 class QuestionDocument(Document):

@@ -1,0 +1,25 @@
+services:
+  backend:
+    image: ghcr.io/maelsrs/poppy-back:latest
+    env_file: .env
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8081
+    environment:
+      - PYTHONPATH=/app
+    ports:
+      - "${APP_PORT}:${APP_PORT}"
+    restart: always
+
+  frontend:
+    image: ghcr.io/maelsrs/poppy-front:latest
+    restart: always
+    environment:
+      - VITE_API_URL=https://0.0.0.0:8081
+    ports:
+      - "443:443"
+      - "80:80"
+
+  watchtower:
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 30 --cleanup

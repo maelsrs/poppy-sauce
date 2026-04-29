@@ -51,18 +51,6 @@ type LeaderboardEntry = {
 
 const sampleCategories: Category[] = [];
 
-const CATEGORY_POOL = [
-  'Grand public', 'Facile', 'Moyen', 'Difficile',
-  '1940s', '1950s', '1960s', '1970s', '1980s', '1990s',
-  'Animaux', 'Anime & Manga', 'Architecture', 'Art', 'Associations',
-  'Bandes dessinées', 'Belgique', 'Capitales', 'Catch', 'Chanson française',
-  'Dessins animés', 'Drapeaux', 'Drapeaux locaux',
-  'Films', "Films d'animation", 'Football', 'Fruits & légumes',
-  'Game of Thrones', 'Géographie',
-  'Héraldique', 'Images', 'Informatique', 'Internet & Mèmes',
-  'J-pop', 'Jeux de société', 'Jeux indé', 'Jeux vidéo',
-];
-
 const IconGear = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
@@ -113,6 +101,7 @@ function LobbyPage() {
   const [showAnswers, setShowAnswers] = useState(true);
   const [categories, setCategories] = useState<Category[]>(sampleCategories);
   const [categoryInput, setCategoryInput] = useState('');
+  const [categoryPool, setCategoryPool] = useState<string[]>([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
@@ -170,6 +159,12 @@ function LobbyPage() {
       if (isOwner) setConfigOpen(true);
     }
   }, [players, isOwner]);
+
+  useEffect(() => {
+    request<string[]>('/questions/categories')
+      .then(setCategoryPool)
+      .catch(() => setCategoryPool([]));
+  }, []);
 
   const sendWsMessage = useCallback((event: string, data?: object) => {
     const socket = socketRef.current;
@@ -557,9 +552,13 @@ function LobbyPage() {
   };
 
   const addCategoryFromName = (name: string) => {
+    const match = categoryPool.find(
+      (c) => c.toLowerCase() === name.toLowerCase(),
+    );
+    if (!match) return;
     setCategories((prev) => {
-      if (prev.some((cat) => cat.name.toLowerCase() === name.toLowerCase())) return prev;
-      const next = [...prev, { id: crypto.randomUUID(), name, mode: 'uniquement' as CategoryMode }];
+      if (prev.some((cat) => cat.name.toLowerCase() === match.toLowerCase())) return prev;
+      const next = [...prev, { id: crypto.randomUUID(), name: match, mode: 'uniquement' as CategoryMode }];
       syncCategories(next);
       return next;
     });
@@ -575,10 +574,10 @@ function LobbyPage() {
   const categoryCount = useMemo(() => categories.length, [categories]);
   const availableCategories = useMemo(() => {
     const normalized = categoryInput.trim().toLowerCase();
-    return CATEGORY_POOL.filter(
+    return categoryPool.filter(
       (name) => !categories.some((cat) => cat.name.toLowerCase() === name.toLowerCase()),
     ).filter((name) => (!normalized ? true : name.toLowerCase().includes(normalized)));
-  }, [categories, categoryInput]);
+  }, [categories, categoryInput, categoryPool]);
 
   const handleSuggestionClick = (name: string) => {
     addCategoryFromName(name);

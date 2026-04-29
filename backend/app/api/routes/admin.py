@@ -73,7 +73,7 @@ class CreateQuestionRequest(BaseModel):
     question: str = Field(..., min_length=1)
     answers: List[str] = Field(..., min_items=1)
     category: str = Field(default="Grand public", min_length=1)
-    question_type: str = Field(default="text")
+    question_type: QuestionType = Field(default=QuestionType.TEXT)
     description: Optional[str] = None
     image_url: Optional[str] = None
 
@@ -82,7 +82,7 @@ class UpdateQuestionRequest(BaseModel):
     question: Optional[str] = Field(default=None, min_length=1)
     answers: Optional[List[str]] = None
     category: Optional[str] = Field(default=None, min_length=1)
-    question_type: Optional[str] = None
+    question_type: Optional[QuestionType] = None
     description: Optional[str] = None
     image_url: Optional[str] = None
 
@@ -244,7 +244,7 @@ async def admin_create_question(
         question=payload.question,
         answers=payload.answers,
         category=payload.category,
-        question_type=QuestionType(payload.question_type),
+        question_type=payload.question_type,
         description=payload.description,
         image_url=payload.image_url,
     )
@@ -269,7 +269,7 @@ async def admin_update_question(
     if payload.category is not None:
         q.category = payload.category
     if payload.question_type is not None:
-        q.question_type = QuestionType(payload.question_type)
+        q.question_type = payload.question_type
     if payload.description is not None:
         q.description = payload.description
     if payload.image_url is not None:

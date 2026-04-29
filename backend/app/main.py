@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from app.api.routes.admin import router as admin_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.health import router as health_router
+from app.api.routes.questions import router as questions_router
 from app.api.routes.rooms import router as rooms_router
 from app.api.routes.stats import router as stats_router
 from app.api.routes.users import router as users_router
@@ -76,6 +77,7 @@ fastapi_app.include_router(auth_router)
 fastapi_app.include_router(rooms_router)
 fastapi_app.include_router(stats_router)
 fastapi_app.include_router(users_router)
+fastapi_app.include_router(questions_router)
 fastapi_app.include_router(admin_router)
 
 app = socketio_lib.ASGIApp(sio, other_asgi_app=fastapi_app)

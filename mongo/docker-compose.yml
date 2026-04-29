@@ -1,0 +1,16 @@
+version: "3.8"
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb_server
+    restart: always
+    environment:
+      MONGO_INITDB_DATABASE: poppy_sauce
+      # C'est ici qu'on sécurise ! Change ces valeurs.
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mongo_data:
