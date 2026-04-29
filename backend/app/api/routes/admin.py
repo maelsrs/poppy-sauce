@@ -107,7 +107,7 @@ async def admin_user_stats(
         {"$group": {"_id": "$rank", "count": {"$sum": 1}}},
         {"$sort": {"_id": 1}},
     ]
-    cursor = UserDocument.get_motor_collection().aggregate(pipeline)
+    cursor = UserDocument.get_pymongo_collection().aggregate(pipeline)
     rows = await cursor.to_list(length=None)
     ranks = [RankStat(name=row["_id"], count=row["count"]) for row in rows]
     total = sum(r.count for r in ranks)
@@ -126,7 +126,7 @@ async def admin_list_users(
         total = await UserDocument.find(query_filter).count()
     else:
         query_filter = {}
-        total = await UserDocument.get_motor_collection().estimated_document_count()
+        total = await UserDocument.get_pymongo_collection().estimated_document_count()
     pages = max(1, ceil(total / per_page))
     skip = (page - 1) * per_page
     users = (
@@ -152,7 +152,7 @@ async def admin_question_stats(
         {"$group": {"_id": "$category", "count": {"$sum": 1}}},
         {"$sort": {"_id": 1}},
     ]
-    cursor = QuestionDocument.get_motor_collection().aggregate(pipeline)
+    cursor = QuestionDocument.get_pymongo_collection().aggregate(pipeline)
     rows = await cursor.to_list(length=None)
     categories = [
         CategoryStat(name=row["_id"], count=row["count"]) for row in rows
@@ -173,7 +173,7 @@ async def admin_list_questions(
         total = await QuestionDocument.find(query_filter).count()
     else:
         query_filter = {}
-        total = await QuestionDocument.get_motor_collection().estimated_document_count()
+        total = await QuestionDocument.get_pymongo_collection().estimated_document_count()
     pages = max(1, ceil(total / per_page))
     skip = (page - 1) * per_page
     questions = (
