@@ -34,10 +34,24 @@ class LeaderboardResponse(BaseModel):
 
 
 @router.get("/me", response_model=PersonalStats)
-async def my_stats(current_user: UserDocument = Depends(get_current_user)) -> PersonalStats:
-    win_rate = (current_user.wins / current_user.games_played * 100) if current_user.games_played > 0 else 0.0
-    accuracy = (current_user.correct_answers / current_user.total_answers * 100) if current_user.total_answers > 0 else 0.0
-    avg_rt = (current_user.total_response_time_ms / current_user.total_responses) if current_user.total_responses > 0 else None
+async def my_stats(
+    current_user: UserDocument = Depends(get_current_user),
+) -> PersonalStats:
+    win_rate = (
+        (current_user.wins / current_user.games_played * 100)
+        if current_user.games_played > 0
+        else 0.0
+    )
+    accuracy = (
+        (current_user.correct_answers / current_user.total_answers * 100)
+        if current_user.total_answers > 0
+        else 0.0
+    )
+    avg_rt = (
+        (current_user.total_response_time_ms / current_user.total_responses)
+        if current_user.total_responses > 0
+        else None
+    )
 
     return PersonalStats(
         games_played=current_user.games_played,
@@ -56,13 +70,16 @@ async def my_stats(current_user: UserDocument = Depends(get_current_user)) -> Pe
 async def leaderboard() -> LeaderboardResponse:
     await ensure_db()
 
-    top_wins_users = await UserDocument.find(
-        UserDocument.wins > 0
-    ).sort("-wins").limit(10).to_list()
+    top_wins_users = (
+        await UserDocument.find(UserDocument.wins > 0).sort("-wins").limit(10).to_list()
+    )
 
-    top_playtime_users = await UserDocument.find(
-        UserDocument.playtime > 0
-    ).sort("-playtime").limit(10).to_list()
+    top_playtime_users = (
+        await UserDocument.find(UserDocument.playtime > 0)
+        .sort("-playtime")
+        .limit(10)
+        .to_list()
+    )
 
     all_with_responses = await UserDocument.find(
         UserDocument.total_responses > 0
@@ -75,8 +92,7 @@ async def leaderboard() -> LeaderboardResponse:
 
     return LeaderboardResponse(
         top_wins=[
-            LeaderboardEntry(username=u.username, value=u.wins)
-            for u in top_wins_users
+            LeaderboardEntry(username=u.username, value=u.wins) for u in top_wins_users
         ],
         top_playtime=[
             LeaderboardEntry(username=u.username, value=u.playtime)

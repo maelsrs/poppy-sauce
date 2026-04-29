@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { FileText, Gamepad2, Lollipop, User } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../auth/AuthContext';
-import { ActionCard, Field, Modal, StatRow } from '../components/ui';
-import { createRoom } from '../services/rooms';
+import { useState } from "react";
+import { FileText, Gamepad2, Lollipop, User } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
+import { ActionCard, Field, Modal, StatRow } from "../components/ui";
+import { createRoom } from "../services/rooms";
 
 const formatPlaytime = (seconds: number) => {
   const minutes = Math.floor(seconds / 60);
@@ -20,9 +20,9 @@ function HomePage() {
   const { user, loading: authLoading, logout } = useAuth();
   const [showCreate, setShowCreate] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
-  const [roomName, setRoomName] = useState('Salon de X');
-  const [privacy, setPrivacy] = useState<'OPEN' | 'PRIVATE'>('PRIVATE');
-  const [joinCode, setJoinCode] = useState('');
+  const [roomName, setRoomName] = useState("Salon de X");
+  const [privacy, setPrivacy] = useState<"OPEN" | "PRIVATE">("PRIVATE");
+  const [joinCode, setJoinCode] = useState("");
   const [creating, setCreating] = useState(false);
 
   const guard = (action: () => void) => {
@@ -30,7 +30,7 @@ function HomePage() {
       return;
     }
     if (!user) {
-      navigate('/auth?mode=login');
+      navigate("/auth?mode=login");
       return;
     }
     action();
@@ -43,7 +43,7 @@ function HomePage() {
     }
     navigate(`/game/${code}`);
     setShowJoin(false);
-    setJoinCode('');
+    setJoinCode("");
   };
 
   const handleCreate = async () => {
@@ -51,7 +51,7 @@ function HomePage() {
       return;
     }
     if (!user) {
-      navigate('/auth?mode=login');
+      navigate("/auth?mode=login");
       return;
     }
     if (!roomName.trim()) {
@@ -78,12 +78,22 @@ function HomePage() {
       <section className="column column--sidebar">
         <div className="account-card">
           <div className="account-card__header">
-            <p className="account-card__eyebrow">{authLoading ? '\u00A0' : user ? 'Connecté' : 'Espace compte'}</p>
+            <p className="account-card__eyebrow">
+              {authLoading ? "\u00A0" : user ? "Connecté" : "Espace compte"}
+            </p>
             <h2 className="account-card__title">
-              {authLoading ? '\u00A0' : user ? `Bienvenue, ${user.username}` : 'Connexion ou inscription'}
+              {authLoading
+                ? "\u00A0"
+                : user
+                  ? `Bienvenue, ${user.username}`
+                  : "Connexion ou inscription"}
             </h2>
             <p className="account-card__hint">
-              {authLoading ? '\u00A0' : user ? user.email : 'Rejoins le lobby pour créer ou rejoindre des parties.'}
+              {authLoading
+                ? "\u00A0"
+                : user
+                  ? user.email
+                  : "Rejoins le lobby pour créer ou rejoindre des parties."}
             </p>
           </div>
 
@@ -99,10 +109,16 @@ function HomePage() {
               </button>
             ) : (
               <>
-                <Link to="/auth?mode=login" className="account-card__btn account-card__btn--primary">
+                <Link
+                  to="/auth?mode=login"
+                  className="account-card__btn account-card__btn--primary"
+                >
                   Se connecter
                 </Link>
-                <Link to="/auth?mode=register" className="account-card__btn account-card__btn--ghost">
+                <Link
+                  to="/auth?mode=register"
+                  className="account-card__btn account-card__btn--ghost"
+                >
                   S&apos;inscrire
                 </Link>
               </>
@@ -112,12 +128,20 @@ function HomePage() {
 
         <div className="stats-card">
           <StatRow label="Niveau" value={user?.level ?? 0} />
-          <StatRow label="Temps de jeu" value={user ? formatPlaytime(user.playtime) : '0m'} />
-          <StatRow label="Rank" value={user?.rank ?? 'Invité'} />
-          <StatRow label="Dernière connexion" value={user?.last_login ? user.last_login.slice(0, 10) : '-'} />
+          <StatRow
+            label="Temps de jeu"
+            value={user ? formatPlaytime(user.playtime) : "0m"}
+          />
+          <StatRow label="Rank" value={user?.rank ?? "Invité"} />
+          <StatRow
+            label="Dernière connexion"
+            value={user?.last_login ? user.last_login.slice(0, 10) : "-"}
+          />
           <div className="stats-card__footer">
             <span className="stat-row__label">Profil</span>
-            <span className="stat-row__value">{user ? 'Connecté' : 'Hors ligne'}</span>
+            <span className="stat-row__value">
+              {user ? "Connecté" : "Hors ligne"}
+            </span>
           </div>
         </div>
       </section>
@@ -129,7 +153,7 @@ function HomePage() {
             tone="blue"
             icon={FileText}
             subIcon={<span>📝</span>}
-            onClick={() => navigate('/public-games')}
+            onClick={() => navigate("/public-games")}
           />
 
           <ActionCard
@@ -142,13 +166,19 @@ function HomePage() {
                 const currentUser = user;
                 if (!currentUser) return;
                 setRoomName(`Salon de ${currentUser.username}`);
-                setPrivacy('PRIVATE');
+                setPrivacy("PRIVATE");
                 setShowCreate(true);
               })
             }
           />
 
-          <ActionCard title="Stats" tone="slate" icon={Gamepad2} subIcon={<span>🎮</span>} onClick={() => navigate('/stats')} />
+          <ActionCard
+            title="Stats"
+            tone="slate"
+            icon={Gamepad2}
+            subIcon={<span>🎮</span>}
+            onClick={() => navigate("/stats")}
+          />
 
           <ActionCard
             title="Rejoindre une partie"
@@ -173,15 +203,15 @@ function HomePage() {
             <div className="account-tabs">
               <button
                 type="button"
-                className={`account-tab ${privacy === 'OPEN' ? 'is-active' : ''}`}
-                onClick={() => setPrivacy('OPEN')}
+                className={`account-tab ${privacy === "OPEN" ? "is-active" : ""}`}
+                onClick={() => setPrivacy("OPEN")}
               >
                 Publique
               </button>
               <button
                 type="button"
-                className={`account-tab ${privacy === 'PRIVATE' ? 'is-active' : ''}`}
-                onClick={() => setPrivacy('PRIVATE')}
+                className={`account-tab ${privacy === "PRIVATE" ? "is-active" : ""}`}
+                onClick={() => setPrivacy("PRIVATE")}
               >
                 Privée
               </button>
@@ -209,12 +239,25 @@ function HomePage() {
 
       {showJoin ? (
         <Modal title="Rejoindre une partie" onClose={() => setShowJoin(false)}>
-          <Field label="Code de la partie" value={joinCode} onChange={setJoinCode} placeholder="ABCDE" />
+          <Field
+            label="Code de la partie"
+            value={joinCode}
+            onChange={setJoinCode}
+            placeholder="ABCDE"
+          />
           <div className="modal__actions">
-            <button type="button" className="account-card__btn account-card__btn--ghost" onClick={() => setShowJoin(false)}>
+            <button
+              type="button"
+              className="account-card__btn account-card__btn--ghost"
+              onClick={() => setShowJoin(false)}
+            >
               Annuler
             </button>
-            <button type="button" className="account-card__btn account-card__btn--primary" onClick={handleJoin}>
+            <button
+              type="button"
+              className="account-card__btn account-card__btn--primary"
+              onClick={handleJoin}
+            >
               Rejoindre
             </button>
           </div>

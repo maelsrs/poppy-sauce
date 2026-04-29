@@ -1,16 +1,26 @@
-import type { ReactNode } from 'react';
-import type { LucideIcon } from 'lucide-react';
+import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 
 export type ActionCardProps = {
   title: string;
   icon?: LucideIcon;
-  tone: 'blue' | 'purple' | 'slate' | 'teal';
+  tone: "blue" | "purple" | "slate" | "teal";
   subIcon: ReactNode;
   onClick?: () => void;
 };
 
-export const ActionCard = ({ title, icon: Icon, tone, subIcon, onClick }: ActionCardProps) => (
-  <button type="button" className={`action-card action-card--${tone}`} onClick={onClick}>
+export const ActionCard = ({
+  title,
+  icon: Icon,
+  tone,
+  subIcon,
+  onClick,
+}: ActionCardProps) => (
+  <button
+    type="button"
+    className={`action-card action-card--${tone}`}
+    onClick={onClick}
+  >
     <span className="action-card__title">{title}</span>
 
     {Icon ? (
@@ -31,7 +41,7 @@ export type StatRowProps = {
   unit?: string;
 };
 
-export const StatRow = ({ label, value, unit = '' }: StatRowProps) => (
+export const StatRow = ({ label, value, unit = "" }: StatRowProps) => (
   <div className="stat-row">
     <span className="stat-row__label">{label}</span>
     <span className="stat-row__value">
@@ -53,7 +63,7 @@ export type FieldProps = {
 
 export const Field = ({
   label,
-  type = 'text',
+  type = "text",
   value,
   onChange,
   onBlur,
@@ -61,7 +71,7 @@ export const Field = ({
   name,
   disabled,
 }: FieldProps) => (
-  <label className={`field ${disabled ? 'field--disabled' : ''}`}>
+  <label className={`field ${disabled ? "field--disabled" : ""}`}>
     <span className="field__label">{label}</span>
     <input
       className="field__input"
@@ -83,7 +93,11 @@ type ModalProps = {
 };
 
 export const Modal = ({ title, children, onClose }: ModalProps) => (
-  <div className="modal-backdrop modal--enter" role="presentation" onClick={onClose}>
+  <div
+    className="modal-backdrop modal--enter"
+    role="presentation"
+    onClick={onClose}
+  >
     <div
       className="modal modal--enter"
       role="dialog"
@@ -93,7 +107,12 @@ export const Modal = ({ title, children, onClose }: ModalProps) => (
     >
       <div className="modal__header">
         <h2 id="modal-title">{title}</h2>
-        <button type="button" className="modal__close" onClick={onClose} aria-label="Fermer">
+        <button
+          type="button"
+          className="modal__close"
+          onClick={onClose}
+          aria-label="Fermer"
+        >
           ×
         </button>
       </div>

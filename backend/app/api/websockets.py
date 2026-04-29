@@ -90,6 +90,7 @@ class GameManager:
         if elapsed_s == 0:
             return
         from app.models.user import UserDocument
+
         user = await UserDocument.find_one({"uuid": player_uuid})
         if user:
             user.playtime += elapsed_s
@@ -101,6 +102,7 @@ class GameManager:
             return
         now = _now_ms()
         from app.models.user import UserDocument
+
         for uid, since in room_dict.items():
             elapsed_s = max(0, (now - since) // 1000)
             if elapsed_s == 0:
@@ -130,7 +132,9 @@ def _config_dict(configurations) -> dict:
         "question_duration": configurations.question_duration,
         "rounds_to_win": configurations.rounds_to_win,
         "show_answers": configurations.show_answers,
-        "categories": [{"name": c.name, "mode": c.mode} for c in configurations.categories],
+        "categories": [
+            {"name": c.name, "mode": c.mode} for c in configurations.categories
+        ],
     }
 
 
@@ -149,14 +153,23 @@ def _get_correct_answers_list(room) -> list[dict]:
         if not ap.is_correct:
             continue
         player = room.find_player(ap.player_uuid)
-        result.append({
-            "player_uuid": ap.player_uuid,
-            "pseudo": player.pseudo if player else "?",
-            "answer": ap.answer,
-        })
-    result.sort(key=lambda x: next(
-        (a.answered_at for a in room.game_data.answered_players if a.player_uuid == x["player_uuid"]), 0
-    ))
+        result.append(
+            {
+                "player_uuid": ap.player_uuid,
+                "pseudo": player.pseudo if player else "?",
+                "answer": ap.answer,
+            }
+        )
+    result.sort(
+        key=lambda x: next(
+            (
+                a.answered_at
+                for a in room.game_data.answered_players
+                if a.player_uuid == x["player_uuid"]
+            ),
+            0,
+        )
+    )
     return result
 
 
@@ -165,6 +178,7 @@ async def _fetch_question(question_id: int):
     if cached:
         return cached
     from app.models.question import QuestionDocument
+
     q = await QuestionDocument.find_one(QuestionDocument.question_id == question_id)
     if q:
         manager.question_cache[question_id] = q
@@ -187,7 +201,11 @@ def _build_category_filter(categories: list) -> dict | None:
     return match if match else None
 
 
-async def _fetch_question_batch(exclude_ids: list[int], size: int = QUESTION_BATCH_SIZE, categories: list | None = None) -> list[int]:
+async def _fetch_question_batch(
+    exclude_ids: list[int],
+    size: int = QUESTION_BATCH_SIZE,
+    categories: list | None = None,
+) -> list[int]:
     from app.models.question import QuestionDocument
 
     cat_filter = _build_category_filter(categories) if categories else None
@@ -228,11 +246,15 @@ async def _send_next_question(room_code: str):
     if room.game_data.current_question_index >= len(room.game_data.question_ids):
         cats = room.configurations.categories or None
         new_ids = await _fetch_question_batch(
-            exclude_ids=room.game_data.used_question_ids, size=QUESTION_BATCH_SIZE, categories=cats
+            exclude_ids=room.game_data.used_question_ids,
+            size=QUESTION_BATCH_SIZE,
+            categories=cats,
         )
         if not new_ids:
             room.game_data.used_question_ids = []
-            new_ids = await _fetch_question_batch(exclude_ids=[], size=QUESTION_BATCH_SIZE, categories=cats)
+            new_ids = await _fetch_question_batch(
+                exclude_ids=[], size=QUESTION_BATCH_SIZE, categories=cats
+            )
         if not new_ids:
             await _end_game(room_code, reason="no_more_questions")
             return
@@ -257,16 +279,20 @@ async def _send_next_question(room_code: str):
 
     manager.skipped_players.pop(room_code, None)
 
-    await sio.emit("new_question", {
-        "question_index": room.game_data.current_question_index,
-        "total_questions": len(room.game_data.question_ids),
-        "question": question.question,
-        "question_type": question.question_type.value,
-        "description": question.description,
-        "image_url": str(question.image_url) if question.image_url else None,
-        "time_limit": room.configurations.question_duration,
-        "round": room.game_data.actual_round,
-    }, room=room_code)
+    await sio.emit(
+        "new_question",
+        {
+            "question_index": room.game_data.current_question_index,
+            "total_questions": len(room.game_data.question_ids),
+            "question": question.question,
+            "question_type": question.question_type.value,
+            "description": question.description,
+            "image_url": str(question.image_url) if question.image_url else None,
+            "time_limit": room.configurations.question_duration,
+            "round": room.game_data.actual_round,
+        },
+        room=room_code,
+    )
 
     manager.cancel_timer(room_code)
     manager.room_timers[room_code] = asyncio.create_task(
@@ -279,6 +305,7 @@ async def _question_timer(room_code: str, duration: int):
         await asyncio.sleep(duration)
 
         from app.models.room import RoomDocument
+
         room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
         correct_answer = None
         description = None
@@ -294,12 +321,16 @@ async def _question_timer(room_code: str, duration: int):
         if room:
             first_pseudo = _get_first_correct_pseudo(room)
 
-        await sio.emit("time_up", {
-            "correct_answer": correct_answer,
-            "description": description,
-            "first_pseudo": first_pseudo,
-            "correct_players": _get_correct_answers_list(room) if room else [],
-        }, room=room_code)
+        await sio.emit(
+            "time_up",
+            {
+                "correct_answer": correct_answer,
+                "description": description,
+                "first_pseudo": first_pseudo,
+                "correct_players": _get_correct_answers_list(room) if room else [],
+            },
+            room=room_code,
+        )
         await asyncio.sleep(DELAY_AFTER_TIME_UP)
         await _advance_question(room_code)
     except asyncio.CancelledError:
@@ -380,12 +411,16 @@ async def _check_all_answered(room_code: str):
                     if q:
                         description = q.description
 
-            await sio.emit("all_answered", {
-                "correct_answer": correct_answer,
-                "description": description,
-                "first_pseudo": _get_first_correct_pseudo(room),
-                "correct_players": _get_correct_answers_list(room),
-            }, room=room_code)
+            await sio.emit(
+                "all_answered",
+                {
+                    "correct_answer": correct_answer,
+                    "description": description,
+                    "first_pseudo": _get_first_correct_pseudo(room),
+                    "correct_players": _get_correct_answers_list(room),
+                },
+                room=room_code,
+            )
             await asyncio.sleep(DELAY_AFTER_ALL_ANSWERED)
             await _advance_question(room_code)
     except asyncio.CancelledError:
@@ -414,12 +449,16 @@ async def _check_round_end(room_code: str, player_uuid: str):
         room.game_data.round_wins[player_uuid] = wins
         await room.save()
 
-        await sio.emit("round_won", {
-            "player_uuid": player_uuid,
-            "pseudo": player.pseudo,
-            "round": room.game_data.actual_round,
-            "round_wins": room.game_data.round_wins,
-        }, room=room_code)
+        await sio.emit(
+            "round_won",
+            {
+                "player_uuid": player_uuid,
+                "pseudo": player.pseudo,
+                "round": room.game_data.actual_round,
+                "round_wins": room.game_data.round_wins,
+            },
+            room=room_code,
+        )
 
         manager.pending_round_win[room_code] = {
             "player_uuid": player_uuid,
@@ -433,7 +472,9 @@ async def _check_round_end(room_code: str, player_uuid: str):
         print(f"[check_round_end] erreur room {room_code}: {e}")
 
 
-async def _end_game(room_code: str, *, winner_uuid: Optional[str] = None, reason: str = "won"):
+async def _end_game(
+    room_code: str, *, winner_uuid: Optional[str] = None, reason: str = "won"
+):
     from app.models.room import GameData, GameState, RoomDocument
 
     room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
@@ -445,20 +486,25 @@ async def _end_game(room_code: str, *, winner_uuid: Optional[str] = None, reason
     room.game_state = GameState.FINISHED
     await room.save()
 
-    sorted_players = sorted(room.players_info, key=lambda p: (
-        -room.game_data.round_wins.get(p.player_uuid, 0),
-        -p.points,
-    ))
+    sorted_players = sorted(
+        room.players_info,
+        key=lambda p: (
+            -room.game_data.round_wins.get(p.player_uuid, 0),
+            -p.points,
+        ),
+    )
 
     leaderboard = []
     for rank, p in enumerate(sorted_players, 1):
-        leaderboard.append({
-            "player_uuid": p.player_uuid,
-            "pseudo": p.pseudo,
-            "points": p.points,
-            "rounds_won": room.game_data.round_wins.get(p.player_uuid, 0),
-            "rank": rank,
-        })
+        leaderboard.append(
+            {
+                "player_uuid": p.player_uuid,
+                "pseudo": p.pseudo,
+                "points": p.points,
+                "rounds_won": room.game_data.round_wins.get(p.player_uuid, 0),
+                "rank": rank,
+            }
+        )
 
     winner_data = None
     if winner_uuid:
@@ -477,11 +523,15 @@ async def _end_game(room_code: str, *, winner_uuid: Optional[str] = None, reason
             "rounds_won": top["rounds_won"],
         }
 
-    await sio.emit("game_finished", {
-        "winner": winner_data,
-        "leaderboard": leaderboard,
-        "reason": reason,
-    }, room=room_code)
+    await sio.emit(
+        "game_finished",
+        {
+            "winner": winner_data,
+            "leaderboard": leaderboard,
+            "reason": reason,
+        },
+        room=room_code,
+    )
 
     has_been_played = len(room.game_data.all_answers) > 0
 
@@ -505,7 +555,9 @@ async def _end_game(room_code: str, *, winner_uuid: Optional[str] = None, reason
             if p.points > user.best_score:
                 user.best_score = p.points
 
-            player_answers = [a for a in room.game_data.all_answers if a.player_uuid == p.player_uuid]
+            player_answers = [
+                a for a in room.game_data.all_answers if a.player_uuid == p.player_uuid
+            ]
             user.total_answers += len(player_answers)
             user.correct_answers += sum(1 for a in player_answers if a.is_correct)
 
@@ -527,9 +579,13 @@ async def _end_game(room_code: str, *, winner_uuid: Optional[str] = None, reason
         p.points = 0
     await room.save()
 
-    await sio.emit("game_reset", {
-        "game_state": "WAITING",
-    }, room=room_code)
+    await sio.emit(
+        "game_reset",
+        {
+            "game_state": "WAITING",
+        },
+        room=room_code,
+    )
 
 
 @sio.event
@@ -545,6 +601,7 @@ async def connect(sid, environ, auth):
 
 def _parse_cookie_header(environ) -> dict:
     from http.cookies import SimpleCookie
+
     cookie_header = environ.get("HTTP_COOKIE", "")
     if not cookie_header:
         for header, value in environ.get("asgi.scope", {}).get("headers", []):
@@ -660,7 +717,9 @@ async def _handle_connect(sid, environ):
                     "question": question.question,
                     "question_type": question.question_type.value,
                     "description": question.description,
-                    "image_url": str(question.image_url) if question.image_url else None,
+                    "image_url": str(question.image_url)
+                    if question.image_url
+                    else None,
                     "question_index": idx,
                     "total_questions": len(room.game_data.question_ids),
                     "time_limit": room.configurations.question_duration,
@@ -679,18 +738,27 @@ async def _handle_connect(sid, environ):
     await sio.emit("room_state", room_state_msg, to=sid)
 
     if player_info:
-        await sio.emit("player_join", {
-            "player": _player_dict(player_info),
-        }, room=room_code, skip_sid=sid)
+        await sio.emit(
+            "player_join",
+            {
+                "player": _player_dict(player_info),
+            },
+            room=room_code,
+            skip_sid=sid,
+        )
 
         if is_new:
-            await sio.emit("chat_message", {
-                "player_uuid": None,
-                "pseudo": None,
-                "text": f"{player_info.pseudo or 'Un joueur'} a rejoint la partie",
-                "timestamp": _now_ms(),
-                "system": True,
-            }, room=room_code)
+            await sio.emit(
+                "chat_message",
+                {
+                    "player_uuid": None,
+                    "pseudo": None,
+                    "text": f"{player_info.pseudo or 'Un joueur'} a rejoint la partie",
+                    "timestamp": _now_ms(),
+                    "system": True,
+                },
+                room=room_code,
+            )
 
 
 @sio.event
@@ -714,26 +782,35 @@ async def disconnect(sid):
 
         await room.mark_player_disconnected(player_uuid=player_uuid, now_ms=_now_ms())
 
-        await sio.emit("player_leave", {
-            "player_uuid": player_uuid,
-        }, room=room_code)
+        await sio.emit(
+            "player_leave",
+            {
+                "player_uuid": player_uuid,
+            },
+            room=room_code,
+        )
 
         async def _delayed_leave_msg():
             await asyncio.sleep(5)
             from app.models.room import RoomDocument as RD
+
             r = await RD.find_one(RD.room_code == room_code)
             if not r:
                 return
             p = r.find_player(player_uuid)
             if p and p.is_connected:
                 return
-            await sio.emit("chat_message", {
-                "player_uuid": None,
-                "pseudo": None,
-                "text": f"{pseudo or 'Un joueur'} a quitté la partie",
-                "timestamp": _now_ms(),
-                "system": True,
-            }, room=room_code)
+            await sio.emit(
+                "chat_message",
+                {
+                    "player_uuid": None,
+                    "pseudo": None,
+                    "text": f"{pseudo or 'Un joueur'} a quitté la partie",
+                    "timestamp": _now_ms(),
+                    "system": True,
+                },
+                room=room_code,
+            )
 
         leave_key = f"{room_code}:{player_uuid}"
         old_task = manager.pending_leave.pop(leave_key, None)
@@ -758,6 +835,7 @@ async def handle_ping(sid, data=None):
 
     room_code, player_uuid = info
     from app.models.room import RoomDocument
+
     room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
     if room:
         player = room.find_player(player_uuid)
@@ -783,11 +861,17 @@ async def handle_start_game(sid, data=None):
         return
 
     cats = room.configurations.categories or None
-    q_ids = await _fetch_question_batch(exclude_ids=[], size=QUESTION_BATCH_SIZE, categories=cats)
+    q_ids = await _fetch_question_batch(
+        exclude_ids=[], size=QUESTION_BATCH_SIZE, categories=cats
+    )
     if not q_ids:
-        await sio.emit("error", {
-            "message": "Aucune question disponible pour ces catégories.",
-        }, to=sid)
+        await sio.emit(
+            "error",
+            {
+                "message": "Aucune question disponible pour ces catégories.",
+            },
+            to=sid,
+        )
         return
 
     room.game_state = GameState.PLAYING
@@ -806,10 +890,14 @@ async def handle_start_game(sid, data=None):
     connected_uuids = [p.player_uuid for p in room.players_info if p.is_connected]
     manager.start_playing(room_code, connected_uuids)
 
-    await sio.emit("game_started", {
-        "game_state": "PLAYING",
-        "started_at": room.game_data.started_at,
-    }, room=room_code)
+    await sio.emit(
+        "game_started",
+        {
+            "game_state": "PLAYING",
+            "started_at": room.game_data.started_at,
+        },
+        room=room_code,
+    )
 
     await _send_next_question(room_code)
 
@@ -902,14 +990,18 @@ async def handle_submit_answer(sid, data=None):
     if not is_correct and room.configurations.show_answers:
         broadcast_answer = answer_text
 
-    await sio.emit("player_answered", {
-        "player_uuid": player_uuid,
-        "pseudo": player.pseudo if player else None,
-        "is_correct": is_correct,
-        "answer": broadcast_answer,
-        "points_awarded": points,
-        "total_points": player.points if player else 0,
-    }, room=room_code)
+    await sio.emit(
+        "player_answered",
+        {
+            "player_uuid": player_uuid,
+            "pseudo": player.pseudo if player else None,
+            "is_correct": is_correct,
+            "answer": broadcast_answer,
+            "points_awarded": points,
+            "total_points": player.points if player else 0,
+        },
+        room=room_code,
+    )
 
     if is_correct:
         asyncio.create_task(_check_round_end(room_code, player_uuid))
@@ -956,12 +1048,16 @@ async def handle_chat_message(sid, data=None):
 
     room = await RoomDocument.find_one(RoomDocument.room_code == room_code)
     player = room.find_player(player_uuid) if room else None
-    await sio.emit("chat_message", {
-        "player_uuid": player_uuid,
-        "pseudo": player.pseudo if player else None,
-        "text": text,
-        "timestamp": _now_ms(),
-    }, room=room_code)
+    await sio.emit(
+        "chat_message",
+        {
+            "player_uuid": player_uuid,
+            "pseudo": player.pseudo if player else None,
+            "text": text,
+            "timestamp": _now_ms(),
+        },
+        room=room_code,
+    )
 
 
 @sio.on("update_config")
@@ -1000,9 +1096,11 @@ async def handle_update_config(sid, data=None):
         room.configurations.show_answers = bool(data["show_answers"])
     if "categories" in data:
         from app.models.room import CategoryConfig
+
         room.configurations.categories = [
             CategoryConfig(name=c["name"], mode=c.get("mode", "uniquement"))
-            for c in data["categories"] if isinstance(c, dict) and c.get("name")
+            for c in data["categories"]
+            if isinstance(c, dict) and c.get("name")
         ]
     await room.save()
 
@@ -1010,7 +1108,13 @@ async def handle_update_config(sid, data=None):
     changes = []
     for key in labels:
         if old[key] != new[key]:
-            val = "Oui" if new[key] is True else "Non" if new[key] is False else f"{new[key]}"
+            val = (
+                "Oui"
+                if new[key] is True
+                else "Non"
+                if new[key] is False
+                else f"{new[key]}"
+            )
             if key == "question_duration":
                 val += "s"
             changes.append(f"{labels[key]} → {val}")
@@ -1028,18 +1132,26 @@ async def handle_update_config(sid, data=None):
         if old_c and old_c["mode"] != c["mode"]:
             changes.append(f"{c['name']} → {c['mode'].upper()}")
 
-    await sio.emit("config_update", {
-        "configurations": new,
-    }, room=room_code)
+    await sio.emit(
+        "config_update",
+        {
+            "configurations": new,
+        },
+        room=room_code,
+    )
 
     if changes:
-        await sio.emit("chat_message", {
-            "player_uuid": None,
-            "pseudo": None,
-            "text": "Paramètres modifiés : " + ", ".join(changes),
-            "timestamp": _now_ms(),
-            "system": True,
-        }, room=room_code)
+        await sio.emit(
+            "chat_message",
+            {
+                "player_uuid": None,
+                "pseudo": None,
+                "text": "Paramètres modifiés : " + ", ".join(changes),
+                "timestamp": _now_ms(),
+                "system": True,
+            },
+            room=room_code,
+        )
 
 
 @sio.on("skip_question")
@@ -1090,12 +1202,16 @@ async def handle_skip_question(sid, data=None):
                 if q:
                     description = q.description
 
-        await sio.emit("all_answered", {
-            "correct_answer": correct_answer,
-            "description": description,
-            "first_pseudo": _get_first_correct_pseudo(room),
-            "correct_players": _get_correct_answers_list(room),
-        }, room=room_code)
+        await sio.emit(
+            "all_answered",
+            {
+                "correct_answer": correct_answer,
+                "description": description,
+                "first_pseudo": _get_first_correct_pseudo(room),
+                "correct_players": _get_correct_answers_list(room),
+            },
+            room=room_code,
+        )
         await asyncio.sleep(DELAY_AFTER_ALL_ANSWERED)
         await _advance_question(room_code)
 

@@ -8,7 +8,12 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
 
-from app.core.security import COOKIE_MAX_AGE, COOKIE_NAME, create_access_token, get_current_user
+from app.core.security import (
+    COOKIE_MAX_AGE,
+    COOKIE_NAME,
+    create_access_token,
+    get_current_user,
+)
 from app.db.client import ensure_db
 from app.models.user import UserCreate, UserDocument, UserPublic, UserRank
 
@@ -60,10 +65,15 @@ async def register(payload: RegisterRequest):
     email = payload.email.lower()
 
     if await UserDocument.find_one({"email": email}):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cette adresse email est déjà utilisée.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cette adresse email est déjà utilisée.",
+        )
 
     if await UserDocument.find_one({"username": payload.username}):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ce pseudo est déjà pris.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Ce pseudo est déjà pris."
+        )
 
     now = datetime.now(timezone.utc)
     user = UserDocument(
@@ -87,8 +97,13 @@ async def login(payload: LoginRequest):
     await ensure_db()
     email = payload.email.lower()
     user = await UserDocument.find_one({"email": email})
-    if not user or not bcrypt.checkpw(payload.password.encode("utf-8"), user.password_hash.encode("utf-8")):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email ou mot de passe incorrect.")
+    if not user or not bcrypt.checkpw(
+        payload.password.encode("utf-8"), user.password_hash.encode("utf-8")
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email ou mot de passe incorrect.",
+        )
 
     user.last_login = datetime.now(timezone.utc)
     await user.save()

@@ -1,12 +1,29 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { fetchMe, loginRequest, logoutRequest, registerRequest, type AuthUser } from '../services/auth';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  fetchMe,
+  loginRequest,
+  logoutRequest,
+  registerRequest,
+  type AuthUser,
+} from "../services/auth";
 
 type AuthContextValue = {
   user: AuthUser | null;
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, username: string, password: string) => Promise<void>;
+  register: (
+    email: string,
+    username: string,
+    password: string,
+  ) => Promise<void>;
   logout: () => void;
   refresh: () => Promise<void>;
   clearError: () => void;
@@ -26,25 +43,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleAuth = useCallback(async (action: () => Promise<{ user: AuthUser }>) => {
-    setError(null);
-    setLoading(true);
-    try {
-      const response = await action();
-      setUser(response.user);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Une erreur est survenue';
-      setError(message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const handleAuth = useCallback(
+    async (action: () => Promise<{ user: AuthUser }>) => {
+      setError(null);
+      setLoading(true);
+      try {
+        const response = await action();
+        setUser(response.user);
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : "Une erreur est survenue";
+        setError(message);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
 
-  const login = useCallback(async (email: string, password: string) => handleAuth(() => loginRequest(email, password)), [handleAuth]);
+  const login = useCallback(
+    async (email: string, password: string) =>
+      handleAuth(() => loginRequest(email, password)),
+    [handleAuth],
+  );
 
   const register = useCallback(
-    async (email: string, username: string, password: string) => handleAuth(() => registerRequest(email, username, password)),
+    async (email: string, username: string, password: string) =>
+      handleAuth(() => registerRequest(email, username, password)),
     [handleAuth],
   );
 
@@ -84,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
   if (!ctx) {
-    throw new Error('');
+    throw new Error("");
   }
   return ctx;
 };

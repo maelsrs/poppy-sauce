@@ -1,4 +1,4 @@
-import { request } from './auth';
+import { request } from "./auth";
 
 export type PersonalStats = {
   games_played: number;
@@ -24,7 +24,7 @@ export type LeaderboardResponse = {
 };
 
 export const fetchStats = async (): Promise<PersonalStats> =>
-  request<PersonalStats>('/stats/me');
+  request<PersonalStats>("/stats/me");
 
 export const fetchLeaderboard = async (): Promise<LeaderboardResponse> =>
-  request<LeaderboardResponse>('/stats/leaderboard');
+  request<LeaderboardResponse>("/stats/leaderboard");

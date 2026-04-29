@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { io, Socket } from 'socket.io-client';
-import { useAuth } from '../auth/AuthContext';
-import { Field } from '../components/ui';
-import { request } from '../services/auth';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { io, Socket } from "socket.io-client";
+import { useAuth } from "../auth/AuthContext";
+import { Field } from "../components/ui";
+import { request } from "../services/auth";
 
-type CategoryMode = 'uniquement' | 'enlever';
+type CategoryMode = "uniquement" | "enlever";
 
 type Category = {
   id: string;
@@ -32,7 +32,6 @@ type CurrentQuestion = {
   total_questions: number;
 };
 
-
 type ChatMessage = {
   player_uuid: string | null;
   pseudo: string;
@@ -52,14 +51,28 @@ type LeaderboardEntry = {
 const sampleCategories: Category[] = [];
 
 const IconGear = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z" />
   </svg>
 );
 
 const IconChevronLeft = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="m15 18-6-6 6-6" />
   </svg>
 );
@@ -71,15 +84,20 @@ type UserProfile = {
 };
 
 const formatPlaytime = (seconds: number): string => {
-  if (seconds < 60) return '< 1min';
+  if (seconds < 60) return "< 1min";
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   if (h > 0) return `${h}h ${m}min`;
   return `${m}min`;
 };
 
-const clampInput = (value: string, min: number, max: number, fallback: number) => {
-  if (value.trim() === '') return fallback;
+const clampInput = (
+  value: string,
+  min: number,
+  max: number,
+  fallback: number,
+) => {
+  if (value.trim() === "") return fallback;
   const parsed = Number(value);
   if (Number.isNaN(parsed)) return fallback;
   return Math.min(max, Math.max(min, parsed));
@@ -88,49 +106,69 @@ const clampInput = (value: string, min: number, max: number, fallback: number) =
 function LobbyPage() {
   const navigate = useNavigate();
   const params = useParams();
-  const roomCode = (params.code ?? '').toUpperCase();
+  const roomCode = (params.code ?? "").toUpperCase();
   const { user, loading: authLoading } = useAuth();
   const [configOpen, setConfigOpen] = useState(false);
   const configInitRef = useRef(false);
   const [targetScore, setTargetScore] = useState(100);
-  const [targetScoreDraft, setTargetScoreDraft] = useState('100');
+  const [targetScoreDraft, setTargetScoreDraft] = useState("100");
   const [duration, setDuration] = useState(20);
-  const [durationDraft, setDurationDraft] = useState('20');
+  const [durationDraft, setDurationDraft] = useState("20");
   const [rounds, setRounds] = useState(1);
-  const [roundsDraft, setRoundsDraft] = useState('1');
+  const [roundsDraft, setRoundsDraft] = useState("1");
   const [showAnswers, setShowAnswers] = useState(true);
   const [categories, setCategories] = useState<Category[]>(sampleCategories);
-  const [categoryInput, setCategoryInput] = useState('');
+  const [categoryInput, setCategoryInput] = useState("");
   const [categoryPool, setCategoryPool] = useState<string[]>([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
 
   const [players, setPlayers] = useState<Player[]>([]);
-  const [playerUuid, setPlayerUuid] = useState<string>('');
-  const [gameState, setGameState] = useState<'WAITING' | 'PLAYING' | 'FINISHED'>('WAITING');
+  const [playerUuid, setPlayerUuid] = useState<string>("");
+  const [gameState, setGameState] = useState<
+    "WAITING" | "PLAYING" | "FINISHED"
+  >("WAITING");
   const [wsReady, setWsReady] = useState(false);
   const [roomNotFound, setRoomNotFound] = useState(false);
 
   // Game state
-  const [currentQuestion, setCurrentQuestion] = useState<CurrentQuestion | null>(null);
+  const [currentQuestion, setCurrentQuestion] =
+    useState<CurrentQuestion | null>(null);
   const [timeLeft, setTimeLeft] = useState(0);
-  const [myAnswer, setMyAnswer] = useState('');
+  const [myAnswer, setMyAnswer] = useState("");
   const [hasAnsweredCorrectly, setHasAnsweredCorrectly] = useState(false);
   const [timeUp, setTimeUp] = useState(false);
   const [correctAnswer, setCorrectAnswer] = useState<string | null>(null);
-  const [answerDescription, setAnswerDescription] = useState<string | null>(null);
-  const [lastWrongAnswer, setLastWrongAnswer] = useState<Record<string, string>>({});
-  const [correctPlayersAnswers, setCorrectPlayersAnswers] = useState<Record<string, string>>({});
-  const [correctPlayerUuids, setCorrectPlayerUuids] = useState<Set<string>>(new Set());
-  const [skippedPlayerUuids, setSkippedPlayerUuids] = useState<Set<string>>(new Set());
+  const [answerDescription, setAnswerDescription] = useState<string | null>(
+    null,
+  );
+  const [lastWrongAnswer, setLastWrongAnswer] = useState<
+    Record<string, string>
+  >({});
+  const [correctPlayersAnswers, setCorrectPlayersAnswers] = useState<
+    Record<string, string>
+  >({});
+  const [correctPlayerUuids, setCorrectPlayerUuids] = useState<Set<string>>(
+    new Set(),
+  );
+  const [skippedPlayerUuids, setSkippedPlayerUuids] = useState<Set<string>>(
+    new Set(),
+  );
   const [allAnswered, setAllAnswered] = useState(false);
   const [firstPseudo, setFirstPseudo] = useState<string | null>(null);
   const [currentRound, setCurrentRound] = useState(1);
   const [roundWins, setRoundWins] = useState<Record<string, number>>({});
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [winner, setWinner] = useState<{ player_uuid: string; pseudo: string; rounds_won: number } | null>(null);
-  const [roundWonInfo, setRoundWonInfo] = useState<{ pseudo: string; round: number } | null>(null);
+  const [winner, setWinner] = useState<{
+    player_uuid: string;
+    pseudo: string;
+    rounds_won: number;
+  } | null>(null);
+  const [roundWonInfo, setRoundWonInfo] = useState<{
+    pseudo: string;
+    round: number;
+  } | null>(null);
 
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -138,11 +176,11 @@ function LobbyPage() {
   const popupRef = useRef<HTMLDivElement>(null);
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState('');
+  const [chatInput, setChatInput] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const [guestPseudo, setGuestPseudo] = useState<string | null>(null);
-  const [pseudoDraft, setPseudoDraft] = useState('');
+  const [pseudoDraft, setPseudoDraft] = useState("");
 
   const timerRef = useRef<number | null>(null);
   const answerInputRef = useRef<HTMLInputElement>(null);
@@ -161,7 +199,7 @@ function LobbyPage() {
   }, [players, isOwner]);
 
   useEffect(() => {
-    request<string[]>('/questions/categories')
+    request<string[]>("/questions/categories")
       .then(setCategoryPool)
       .catch(() => setCategoryPool([]));
   }, []);
@@ -175,12 +213,15 @@ function LobbyPage() {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setDropdownOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -215,29 +256,36 @@ function LobbyPage() {
   useEffect(() => {
     if (currentQuestion && !hasAnsweredCorrectly && !timeUp && !allAnswered) {
       setTimeout(() => answerInputRef.current?.focus(), 100);
-    } else if (hasAnsweredCorrectly || timeUp || allAnswered || gameState !== 'PLAYING') {
+    } else if (
+      hasAnsweredCorrectly ||
+      timeUp ||
+      allAnswered ||
+      gameState !== "PLAYING"
+    ) {
       setTimeout(() => chatInputRef.current?.focus(), 100);
     }
   }, [currentQuestion, hasAnsweredCorrectly, timeUp, allAnswered, gameState]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.shiftKey && e.key === 'Delete' && gameState === 'PLAYING') {
+      if (e.shiftKey && e.key === "Delete" && gameState === "PLAYING") {
         e.preventDefault();
         handleSkip();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   });
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user && !localStorage.getItem('poppy.guest.pseudo')) {
+    if (!user && !localStorage.getItem("poppy.guest.pseudo")) {
       setGuestPseudo(null);
       return;
     }
-    setGuestPseudo(user?.username ?? localStorage.getItem('poppy.guest.pseudo'));
+    setGuestPseudo(
+      user?.username ?? localStorage.getItem("poppy.guest.pseudo"),
+    );
   }, [authLoading, user]);
 
   useEffect(() => {
@@ -245,10 +293,11 @@ function LobbyPage() {
     if (authLoading) return;
     if (!user && guestPseudo === null) return;
 
-    const guestKey = 'poppy.guest.uuid';
+    const guestKey = "poppy.guest.uuid";
 
-    const uuid = user?.uuid ?? (localStorage.getItem(guestKey) || crypto.randomUUID());
-    const pseudo = user?.username ?? guestPseudo ?? 'Invité';
+    const uuid =
+      user?.uuid ?? (localStorage.getItem(guestKey) || crypto.randomUUID());
+    const pseudo = user?.username ?? guestPseudo ?? "Invité";
 
     if (!user) {
       localStorage.setItem(guestKey, uuid);
@@ -256,12 +305,12 @@ function LobbyPage() {
 
     setPlayerUuid(uuid);
 
-    const apiBase = import.meta.env.VITE_API_URL ?? 'http://localhost:8081';
+    const apiBase = import.meta.env.VITE_API_URL ?? "http://localhost:8081";
 
     const socket = io(apiBase, {
-      path: '/socket.io/',
+      path: "/socket.io/",
       query: { room_code: roomCode, player_uuid: uuid, pseudo },
-      transports: ['websocket'],
+      transports: ["websocket"],
       withCredentials: true,
       reconnection: true,
       reconnectionDelay: 1000,
@@ -269,12 +318,12 @@ function LobbyPage() {
     });
     socketRef.current = socket;
 
-    socket.on('room_state', (msg) => {
+    socket.on("room_state", (msg) => {
       setPlayers(msg.players ?? []);
       setWsReady(true);
-      if (msg.game_state === 'PLAYING') setGameState('PLAYING');
-      else if (msg.game_state === 'FINISHED') setGameState('FINISHED');
-      else setGameState('WAITING');
+      if (msg.game_state === "PLAYING") setGameState("PLAYING");
+      else if (msg.game_state === "FINISHED") setGameState("FINISHED");
+      else setGameState("WAITING");
       if (msg.configurations) {
         setTargetScore(msg.configurations.score_objective);
         setTargetScoreDraft(String(msg.configurations.score_objective));
@@ -286,11 +335,15 @@ function LobbyPage() {
           setShowAnswers(msg.configurations.show_answers);
         }
         if (msg.configurations.categories) {
-          setCategories(msg.configurations.categories.map((c: { name: string; mode: string }) => ({
-            id: crypto.randomUUID(),
-            name: c.name,
-            mode: c.mode as CategoryMode,
-          })));
+          setCategories(
+            msg.configurations.categories.map(
+              (c: { name: string; mode: string }) => ({
+                id: crypto.randomUUID(),
+                name: c.name,
+                mode: c.mode as CategoryMode,
+              }),
+            ),
+          );
         }
       }
       if (msg.current_question) {
@@ -313,7 +366,7 @@ function LobbyPage() {
         setFirstPseudo(null);
         setCorrectAnswer(null);
         setAnswerDescription(null);
-        setMyAnswer('');
+        setMyAnswer("");
         setLastWrongAnswer({});
         setCorrectPlayersAnswers({});
         if (msg.answered_players) {
@@ -328,8 +381,8 @@ function LobbyPage() {
       if (msg.round_wins) setRoundWins(msg.round_wins);
     });
 
-    socket.on('game_started', () => {
-      setGameState('PLAYING');
+    socket.on("game_started", () => {
+      setGameState("PLAYING");
       setConfigOpen(false);
       setLeaderboard([]);
       setWinner(null);
@@ -347,7 +400,7 @@ function LobbyPage() {
       setRoundWonInfo(null);
     });
 
-    socket.on('new_question', (msg) => {
+    socket.on("new_question", (msg) => {
       setCurrentQuestion({
         question: msg.question,
         question_type: msg.question_type,
@@ -365,7 +418,7 @@ function LobbyPage() {
         }
         return msg.round;
       });
-      setMyAnswer('');
+      setMyAnswer("");
       setHasAnsweredCorrectly(false);
       setTimeUp(false);
       setAllAnswered(false);
@@ -378,7 +431,7 @@ function LobbyPage() {
       setRoundWonInfo(null);
     });
 
-    socket.on('player_answered', (msg) => {
+    socket.on("player_answered", (msg) => {
       if (msg.is_correct) {
         setCorrectPlayerUuids((prev) => new Set(prev).add(msg.player_uuid));
         if (msg.player_uuid === uuid) {
@@ -387,29 +440,35 @@ function LobbyPage() {
       }
       setPlayers((prev) =>
         prev.map((p) =>
-          p.player_uuid === msg.player_uuid ? { ...p, points: msg.total_points } : p,
+          p.player_uuid === msg.player_uuid
+            ? { ...p, points: msg.total_points }
+            : p,
         ),
       );
       if (!msg.is_correct && msg.answer) {
-        setLastWrongAnswer((prev) => ({ ...prev, [msg.player_uuid]: msg.answer }));
+        setLastWrongAnswer((prev) => ({
+          ...prev,
+          [msg.player_uuid]: msg.answer,
+        }));
       }
     });
 
-    socket.on('all_answered', (msg) => {
+    socket.on("all_answered", (msg) => {
       setCorrectAnswer(msg.correct_answer ?? null);
       setAnswerDescription(msg.description ?? null);
       setFirstPseudo(msg.first_pseudo ?? null);
       setAllAnswered(true);
       const map: Record<string, string> = {};
-      for (const cp of msg.correct_players ?? []) map[cp.player_uuid] = cp.answer;
+      for (const cp of msg.correct_players ?? [])
+        map[cp.player_uuid] = cp.answer;
       setCorrectPlayersAnswers(map);
     });
 
-    socket.on('player_skipped', (msg) => {
+    socket.on("player_skipped", (msg) => {
       setSkippedPlayerUuids((prev) => new Set(prev).add(msg.player_uuid));
     });
 
-    socket.on('player_unskipped', (msg) => {
+    socket.on("player_unskipped", (msg) => {
       setSkippedPlayerUuids((prev) => {
         const next = new Set(prev);
         next.delete(msg.player_uuid);
@@ -417,30 +476,31 @@ function LobbyPage() {
       });
     });
 
-    socket.on('time_up', (msg) => {
+    socket.on("time_up", (msg) => {
       setTimeUp(true);
       setTimeLeft(0);
       setCorrectAnswer(msg.correct_answer ?? null);
       setAnswerDescription(msg.description ?? null);
       setFirstPseudo(msg.first_pseudo ?? null);
       const map: Record<string, string> = {};
-      for (const cp of msg.correct_players ?? []) map[cp.player_uuid] = cp.answer;
+      for (const cp of msg.correct_players ?? [])
+        map[cp.player_uuid] = cp.answer;
       setCorrectPlayersAnswers(map);
     });
 
-    socket.on('round_won', (msg) => {
+    socket.on("round_won", (msg) => {
       setRoundWins(msg.round_wins ?? {});
       setRoundWonInfo({ pseudo: msg.pseudo, round: msg.round });
     });
 
-    socket.on('game_finished', (msg) => {
-      setGameState('FINISHED');
+    socket.on("game_finished", (msg) => {
+      setGameState("FINISHED");
       setLeaderboard(msg.leaderboard ?? []);
       setWinner(msg.winner ?? null);
     });
 
-    socket.on('game_reset', () => {
-      setGameState('WAITING');
+    socket.on("game_reset", () => {
+      setGameState("WAITING");
       setCurrentQuestion(null);
       setLeaderboard([]);
       setWinner(null);
@@ -459,13 +519,17 @@ function LobbyPage() {
       setPlayers((prev) => prev.map((p) => ({ ...p, points: 0 })));
     });
 
-    socket.on('player_join', (msg) => {
+    socket.on("player_join", (msg) => {
       if (msg.player) {
         setPlayers((prev) => {
-          const exists = prev.some((p) => p.player_uuid === msg.player.player_uuid);
+          const exists = prev.some(
+            (p) => p.player_uuid === msg.player.player_uuid,
+          );
           if (exists) {
             return prev.map((p) =>
-              p.player_uuid === msg.player.player_uuid ? { ...p, ...msg.player } : p,
+              p.player_uuid === msg.player.player_uuid
+                ? { ...p, ...msg.player }
+                : p,
             );
           }
           return [...prev, msg.player];
@@ -473,13 +537,15 @@ function LobbyPage() {
       }
     });
 
-    socket.on('player_leave', (msg) => {
+    socket.on("player_leave", (msg) => {
       if (msg.player_uuid) {
-        setPlayers((prev) => prev.filter((p) => p.player_uuid !== msg.player_uuid));
+        setPlayers((prev) =>
+          prev.filter((p) => p.player_uuid !== msg.player_uuid),
+        );
       }
     });
 
-    socket.on('config_update', (msg) => {
+    socket.on("config_update", (msg) => {
       if (msg.configurations) {
         setTargetScore(msg.configurations.score_objective);
         setTargetScoreDraft(String(msg.configurations.score_objective));
@@ -491,31 +557,38 @@ function LobbyPage() {
           setShowAnswers(msg.configurations.show_answers);
         }
         if (msg.configurations.categories) {
-          setCategories(msg.configurations.categories.map((c: { name: string; mode: string }) => ({
-            id: crypto.randomUUID(),
-            name: c.name,
-            mode: c.mode as CategoryMode,
-          })));
+          setCategories(
+            msg.configurations.categories.map(
+              (c: { name: string; mode: string }) => ({
+                id: crypto.randomUUID(),
+                name: c.name,
+                mode: c.mode as CategoryMode,
+              }),
+            ),
+          );
         }
       }
     });
 
-    socket.on('chat_message', (msg) => {
-      setChatMessages((prev) => [...prev.slice(-99), {
-        player_uuid: msg.player_uuid ?? null,
-        pseudo: msg.pseudo ?? 'Anonyme',
-        text: msg.text,
-        timestamp: msg.timestamp,
-        system: msg.system ?? false,
-      }]);
+    socket.on("chat_message", (msg) => {
+      setChatMessages((prev) => [
+        ...prev.slice(-99),
+        {
+          player_uuid: msg.player_uuid ?? null,
+          pseudo: msg.pseudo ?? "Anonyme",
+          text: msg.text,
+          timestamp: msg.timestamp,
+          system: msg.system ?? false,
+        },
+      ]);
     });
 
-    socket.on('error', (msg) => {
+    socket.on("error", (msg) => {
       alert(msg.message);
     });
 
-    socket.on('connect_error', (err) => {
-      if (err.message === 'Room introuvable') {
+    socket.on("connect_error", (err) => {
+      if (err.message === "Room introuvable") {
         setRoomNotFound(true);
       }
     });
@@ -528,15 +601,23 @@ function LobbyPage() {
   }, [authLoading, guestPseudo, navigate, roomCode, user]);
 
   const syncCategories = (cats: Category[]) => {
-    if (isOwner) sendWsMessage('update_config', {
-      categories: cats.map((c) => ({ name: c.name, mode: c.mode })),
-    });
+    if (isOwner)
+      sendWsMessage("update_config", {
+        categories: cats.map((c) => ({ name: c.name, mode: c.mode })),
+      });
   };
 
   const toggleMode = (id: string) => {
     setCategories((prev) => {
       const next = prev.map((cat) =>
-        cat.id === id ? { ...cat, mode: (cat.mode === 'uniquement' ? 'enlever' : 'uniquement') as CategoryMode } : cat,
+        cat.id === id
+          ? {
+              ...cat,
+              mode: (cat.mode === "uniquement"
+                ? "enlever"
+                : "uniquement") as CategoryMode,
+            }
+          : cat,
       );
       syncCategories(next);
       return next;
@@ -557,12 +638,20 @@ function LobbyPage() {
     );
     if (!match) return;
     setCategories((prev) => {
-      if (prev.some((cat) => cat.name.toLowerCase() === match.toLowerCase())) return prev;
-      const next = [...prev, { id: crypto.randomUUID(), name: match, mode: 'uniquement' as CategoryMode }];
+      if (prev.some((cat) => cat.name.toLowerCase() === match.toLowerCase()))
+        return prev;
+      const next = [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          name: match,
+          mode: "uniquement" as CategoryMode,
+        },
+      ];
       syncCategories(next);
       return next;
     });
-    setCategoryInput('');
+    setCategoryInput("");
   };
 
   const addCategory = () => {
@@ -574,9 +663,16 @@ function LobbyPage() {
   const categoryCount = useMemo(() => categories.length, [categories]);
   const availableCategories = useMemo(() => {
     const normalized = categoryInput.trim().toLowerCase();
-    return categoryPool.filter(
-      (name) => !categories.some((cat) => cat.name.toLowerCase() === name.toLowerCase()),
-    ).filter((name) => (!normalized ? true : name.toLowerCase().includes(normalized)));
+    return categoryPool
+      .filter(
+        (name) =>
+          !categories.some(
+            (cat) => cat.name.toLowerCase() === name.toLowerCase(),
+          ),
+      )
+      .filter((name) =>
+        !normalized ? true : name.toLowerCase().includes(normalized),
+      );
   }, [categories, categoryInput, categoryPool]);
 
   const handleSuggestionClick = (name: string) => {
@@ -590,72 +686,78 @@ function LobbyPage() {
     const clamped = clampInput(targetScoreDraft, 10, 1500, targetScore);
     setTargetScore(clamped);
     setTargetScoreDraft(String(clamped));
-    if (isOwner) sendWsMessage('update_config', { score_objective: clamped });
+    if (isOwner) sendWsMessage("update_config", { score_objective: clamped });
   };
 
   const handleDurationBlur = () => {
     const clamped = clampInput(durationDraft, 5, 60, duration);
     setDuration(clamped);
     setDurationDraft(String(clamped));
-    if (isOwner) sendWsMessage('update_config', { question_duration: clamped });
+    if (isOwner) sendWsMessage("update_config", { question_duration: clamped });
   };
 
   const handleRoundsBlur = () => {
     const clamped = clampInput(roundsDraft, 1, 50, rounds);
     setRounds(clamped);
     setRoundsDraft(String(clamped));
-    if (isOwner) sendWsMessage('update_config', { rounds_to_win: clamped });
+    if (isOwner) sendWsMessage("update_config", { rounds_to_win: clamped });
   };
 
   const handleSubmitAnswer = () => {
     if (hasAnsweredCorrectly || timeUp || allAnswered) return;
     if (!myAnswer.trim()) {
       if (skippedPlayerUuids.has(playerUuid)) {
-        sendWsMessage('unskip_question');
+        sendWsMessage("unskip_question");
       }
       return;
     }
-    sendWsMessage('submit_answer', { answer: myAnswer.trim() });
-    setMyAnswer('');
+    sendWsMessage("submit_answer", { answer: myAnswer.trim() });
+    setMyAnswer("");
   };
-
 
   const handleSkip = () => {
     if (hasAnsweredCorrectly || timeUp) return;
     if (skippedPlayerUuids.has(playerUuid)) return;
-    sendWsMessage('skip_question');
+    sendWsMessage("skip_question");
   };
 
   const handleSendChat = () => {
     const text = chatInput.trim();
     if (!text) return;
-    sendWsMessage('chat_message', { text });
-    setChatInput('');
+    sendWsMessage("chat_message", { text });
+    setChatInput("");
   };
 
-  const handlePlayerClick = useCallback((player: Player) => {
-    if (selectedPlayer?.player_uuid === player.player_uuid) {
-      setSelectedPlayer(null);
-      return;
-    }
-    setSelectedPlayer(player);
-    setUserProfile(null);
-    setProfileLoading(true);
-    request<UserProfile>(`/users/${player.player_uuid}`)
-      .then((data) => setUserProfile(data))
-      .catch(() => setUserProfile(null))
-      .finally(() => setProfileLoading(false));
-  }, [selectedPlayer]);
+  const handlePlayerClick = useCallback(
+    (player: Player) => {
+      if (selectedPlayer?.player_uuid === player.player_uuid) {
+        setSelectedPlayer(null);
+        return;
+      }
+      setSelectedPlayer(player);
+      setUserProfile(null);
+      setProfileLoading(true);
+      request<UserProfile>(`/users/${player.player_uuid}`)
+        .then((data) => setUserProfile(data))
+        .catch(() => setUserProfile(null))
+        .finally(() => setProfileLoading(false));
+    },
+    [selectedPlayer],
+  );
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
+      if (
+        popupRef.current &&
+        !popupRef.current.contains(event.target as Node)
+      ) {
         setSelectedPlayer(null);
       }
     };
     if (selectedPlayer) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [selectedPlayer]);
 
@@ -663,7 +765,6 @@ function LobbyPage() {
     () => [...players].sort((a, b) => b.points - a.points),
     [players],
   );
-
 
   const renderPlayingScreen = () => (
     <div className="game-screen">
@@ -676,7 +777,9 @@ function LobbyPage() {
             </span>
           )}
         </div>
-        <div className={`game-timer ${timeLeft <= 5 ? 'game-timer--danger' : ''}`}>
+        <div
+          className={`game-timer ${timeLeft <= 5 ? "game-timer--danger" : ""}`}
+        >
           {timeLeft}s
         </div>
       </div>
@@ -690,33 +793,51 @@ function LobbyPage() {
       {currentQuestion && (
         <div className="game-question-area">
           {currentQuestion.image_url && (
-            <img src={currentQuestion.image_url} alt="" className="game-question-image" />
+            <img
+              src={currentQuestion.image_url}
+              alt=""
+              className="game-question-image"
+            />
           )}
           <h2 className="game-question-text">{currentQuestion.question}</h2>
           {currentQuestion.description && (
-            <p className="game-question-description">{currentQuestion.description}</p>
+            <p className="game-question-description">
+              {currentQuestion.description}
+            </p>
           )}
         </div>
       )}
 
-      {(timeUp || allAnswered) ? (
-        <div className={`game-reveal ${hasAnsweredCorrectly ? 'game-reveal--correct' : 'game-reveal--missed'}`}>
-          {correctAnswer && <div className="game-reveal__answer">{correctAnswer}</div>}
-          {answerDescription && <div className="game-reveal__description">{answerDescription}</div>}
+      {timeUp || allAnswered ? (
+        <div
+          className={`game-reveal ${hasAnsweredCorrectly ? "game-reveal--correct" : "game-reveal--missed"}`}
+        >
+          {correctAnswer && (
+            <div className="game-reveal__answer">{correctAnswer}</div>
+          )}
+          {answerDescription && (
+            <div className="game-reveal__description">{answerDescription}</div>
+          )}
           <div className="game-reveal__footer">
-            {firstPseudo ? <>{firstPseudo} a trouvé en premier</> : <>Personne n'a trouvé</>}
+            {firstPseudo ? (
+              <>{firstPseudo} a trouvé en premier</>
+            ) : (
+              <>Personne n'a trouvé</>
+            )}
           </div>
         </div>
       ) : hasAnsweredCorrectly ? (
         <div className="game-reveal game-reveal--correct">
           <div className="game-reveal__answer">Trouvé !</div>
-          <div className="game-reveal__footer">En attente des autres joueurs...</div>
+          <div className="game-reveal__footer">
+            En attente des autres joueurs...
+          </div>
         </div>
       ) : (
         <div className="game-answer-area game-answer-area--with-skip">
           <button
             type="button"
-            className={`game-skip-btn ${skippedPlayerUuids.has(playerUuid) ? 'is-skipped' : ''}`}
+            className={`game-skip-btn ${skippedPlayerUuids.has(playerUuid) ? "is-skipped" : ""}`}
             onClick={handleSkip}
             title="Skip (Shift+Suppr)"
           >
@@ -728,16 +849,23 @@ function LobbyPage() {
             className="game-answer-input"
             value={myAnswer}
             onChange={(e) => setMyAnswer(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSubmitAnswer()}
-            placeholder={skippedPlayerUuids.has(playerUuid) ? 'Répondre pour annuler le skip...' : 'Tapez votre réponse...'}
+            onKeyDown={(e) => e.key === "Enter" && handleSubmitAnswer()}
+            placeholder={
+              skippedPlayerUuids.has(playerUuid)
+                ? "Répondre pour annuler le skip..."
+                : "Tapez votre réponse..."
+            }
             autoComplete="off"
           />
-          <button type="button" className="game-answer-btn" onClick={handleSubmitAnswer}>
+          <button
+            type="button"
+            className="game-answer-btn"
+            onClick={handleSubmitAnswer}
+          >
             ENVOYER
           </button>
         </div>
       )}
-
     </div>
   );
 
@@ -759,8 +887,8 @@ function LobbyPage() {
               <h2 className="finished-hero__name">{winner.pseudo}</h2>
               <span className="finished-hero__sub">
                 Vainqueur · {winner.rounds_won} round
-                {winner.rounds_won > 1 ? 's' : ''} gagné
-                {winner.rounds_won > 1 ? 's' : ''}
+                {winner.rounds_won > 1 ? "s" : ""} gagné
+                {winner.rounds_won > 1 ? "s" : ""}
               </span>
             </>
           ) : (
@@ -778,7 +906,9 @@ function LobbyPage() {
                 <span className="finished-podium__rank">#{entry.rank}</span>
                 <span className="finished-podium__pseudo">{entry.pseudo}</span>
                 <div className="finished-podium__stats">
-                  <span className="finished-podium__pts">{entry.points} pts</span>
+                  <span className="finished-podium__pts">
+                    {entry.points} pts
+                  </span>
                   <span className="finished-podium__rounds">
                     {entry.rounds_won}R
                   </span>
@@ -815,8 +945,12 @@ function LobbyPage() {
       <div className="stage-content">
         <div className="placeholder-box">
           <span className="status-dot pulsing" />
-          <h2>{roomCode ? `Room ${roomCode}` : 'En attente de lancement'}</h2>
-          <p>{isOwner ? 'Lancez la partie quand tout le monde est prêt !' : "L'hôte configure la partie..."}</p>
+          <h2>{roomCode ? `Room ${roomCode}` : "En attente de lancement"}</h2>
+          <p>
+            {isOwner
+              ? "Lancez la partie quand tout le monde est prêt !"
+              : "L'hôte configure la partie..."}
+          </p>
         </div>
       </div>
       <div className="stage-footer">
@@ -824,7 +958,7 @@ function LobbyPage() {
           <button
             type="button"
             className="btn-join"
-            onClick={() => sendWsMessage('start_game')}
+            onClick={() => sendWsMessage("start_game")}
           >
             LANCER LA PARTIE
           </button>
@@ -836,37 +970,52 @@ function LobbyPage() {
   );
 
   const truncate = (text: string, max: number) =>
-    text.length > max ? text.slice(0, max) + '...' : text;
+    text.length > max ? text.slice(0, max) + "..." : text;
 
   const renderPlayersList = () => (
-    <div className="sidebar-section players-list-section" style={{ position: 'relative' }}>
+    <div
+      className="sidebar-section players-list-section"
+      style={{ position: "relative" }}
+    >
       <div className="section-header">
-        <h4>JOUEURS <span className="dimmed">({players.length})</span></h4>
+        <h4>
+          JOUEURS <span className="dimmed">({players.length})</span>
+        </h4>
       </div>
 
       {selectedPlayer && (
         <div className="player-profile-popup" ref={popupRef}>
           <div className="profile-popup__header">
             <div className="profile-popup__name">
-              <span>{selectedPlayer.pseudo ?? 'Anonyme'}</span>
-              {selectedPlayer.is_owner && <span className="host-badge">Hôte</span>}
+              <span>{selectedPlayer.pseudo ?? "Anonyme"}</span>
+              {selectedPlayer.is_owner && (
+                <span className="host-badge">Hôte</span>
+              )}
             </div>
-            <button type="button" className="profile-popup__close" onClick={() => setSelectedPlayer(null)}>
+            <button
+              type="button"
+              className="profile-popup__close"
+              onClick={() => setSelectedPlayer(null)}
+            >
               ✕
             </button>
           </div>
 
           <div className="profile-popup__section">
             <h5 className="profile-popup__section-title">Room</h5>
-            {gameState === 'PLAYING' && (
+            {gameState === "PLAYING" && (
               <div className="profile-popup__row">
                 <span className="profile-popup__label">Points</span>
-                <span className="profile-popup__value">{selectedPlayer.points}</span>
+                <span className="profile-popup__value">
+                  {selectedPlayer.points}
+                </span>
               </div>
             )}
             <div className="profile-popup__row">
               <span className="profile-popup__label">Rounds gagnés</span>
-              <span className="profile-popup__value">{roundWins[selectedPlayer.player_uuid] ?? 0}</span>
+              <span className="profile-popup__value">
+                {roundWins[selectedPlayer.player_uuid] ?? 0}
+              </span>
             </div>
           </div>
 
@@ -878,15 +1027,21 @@ function LobbyPage() {
               <>
                 <div className="profile-popup__row">
                   <span className="profile-popup__label">Pseudo</span>
-                  <span className="profile-popup__value">{userProfile.username}</span>
+                  <span className="profile-popup__value">
+                    {userProfile.username}
+                  </span>
                 </div>
                 <div className="profile-popup__row">
                   <span className="profile-popup__label">Niveau</span>
-                  <span className="profile-popup__value">{userProfile.level}</span>
+                  <span className="profile-popup__value">
+                    {userProfile.level}
+                  </span>
                 </div>
                 <div className="profile-popup__row">
                   <span className="profile-popup__label">Temps de jeu</span>
-                  <span className="profile-popup__value">{formatPlaytime(userProfile.playtime)}</span>
+                  <span className="profile-popup__value">
+                    {formatPlaytime(userProfile.playtime)}
+                  </span>
                 </div>
               </>
             ) : (
@@ -905,29 +1060,39 @@ function LobbyPage() {
           return (
             <div
               key={player.player_uuid}
-              className={`player-row ${isCorrect && gameState === 'PLAYING' ? 'player-row--correct' : ''} ${isSkipped && gameState === 'PLAYING' ? 'player-row--skipped' : ''} ${selectedPlayer?.player_uuid === player.player_uuid ? 'player-row--selected' : ''}`}
+              className={`player-row ${isCorrect && gameState === "PLAYING" ? "player-row--correct" : ""} ${isSkipped && gameState === "PLAYING" ? "player-row--skipped" : ""} ${selectedPlayer?.player_uuid === player.player_uuid ? "player-row--selected" : ""}`}
               onClick={() => handlePlayerClick(player)}
-              style={{ cursor: 'pointer' }}
+              style={{ cursor: "pointer" }}
             >
-              <div className={`avatar ${player.is_owner ? 'host' : ''}`}>
-                {(player.pseudo ?? '?').charAt(0)}
+              <div className={`avatar ${player.is_owner ? "host" : ""}`}>
+                {(player.pseudo ?? "?").charAt(0)}
               </div>
               <div className="player-info">
                 <div className="player-info__top">
-                  <span className="player-name">{player.pseudo ?? 'Anonyme'}</span>
+                  <span className="player-name">
+                    {player.pseudo ?? "Anonyme"}
+                  </span>
                   {player.is_owner && <span className="host-badge">Hôte</span>}
                   {roundWins[player.player_uuid] > 0 && (
-                    <span className="round-wins-badge">{roundWins[player.player_uuid]}R</span>
+                    <span className="round-wins-badge">
+                      {roundWins[player.player_uuid]}R
+                    </span>
                   )}
                 </div>
-                {gameState === 'PLAYING' && (timeUp || allAnswered) && correctAnswerText && (
-                  <span className="player-correct-answer">&#x2714; {truncate(correctAnswerText, 25)}</span>
-                )}
-                {gameState === 'PLAYING' && wrongAnswer && !isCorrect && (
-                  <span className="player-wrong-answer">&#x2716; {truncate(wrongAnswer, 25)}</span>
+                {gameState === "PLAYING" &&
+                  (timeUp || allAnswered) &&
+                  correctAnswerText && (
+                    <span className="player-correct-answer">
+                      &#x2714; {truncate(correctAnswerText, 25)}
+                    </span>
+                  )}
+                {gameState === "PLAYING" && wrongAnswer && !isCorrect && (
+                  <span className="player-wrong-answer">
+                    &#x2716; {truncate(wrongAnswer, 25)}
+                  </span>
                 )}
               </div>
-              {gameState === 'PLAYING' && (
+              {gameState === "PLAYING" && (
                 <span className="player-points">{player.points}</span>
               )}
             </div>
@@ -940,7 +1105,7 @@ function LobbyPage() {
   const handlePseudoConfirm = () => {
     const name = pseudoDraft.trim();
     if (!name || name.length < 2) return;
-    localStorage.setItem('poppy.guest.pseudo', name);
+    localStorage.setItem("poppy.guest.pseudo", name);
     setGuestPseudo(name);
   };
 
@@ -957,7 +1122,7 @@ function LobbyPage() {
                 className="pseudo-popup__input"
                 value={pseudoDraft}
                 onChange={(e) => setPseudoDraft(e.target.value.slice(0, 20))}
-                onKeyDown={(e) => e.key === 'Enter' && handlePseudoConfirm()}
+                onKeyDown={(e) => e.key === "Enter" && handlePseudoConfirm()}
                 placeholder="Pseudo..."
                 maxLength={20}
                 autoFocus
@@ -984,12 +1149,15 @@ function LobbyPage() {
           <div className="stage-content">
             <div className="placeholder-box">
               <h2>Cette partie n'existe pas</h2>
-              <p>Le code <strong>{roomCode}</strong> ne correspond à aucune partie en cours.</p>
+              <p>
+                Le code <strong>{roomCode}</strong> ne correspond à aucune
+                partie en cours.
+              </p>
               <button
                 type="button"
                 className="btn-join"
                 style={{ marginTop: 16 }}
-                onClick={() => navigate('/')}
+                onClick={() => navigate("/")}
               >
                 RETOUR À L'ACCUEIL
               </button>
@@ -1017,7 +1185,9 @@ function LobbyPage() {
   }
 
   return (
-    <div className={`lobby-shell ${configOpen ? 'is-config-open' : 'is-config-closed'}`}>
+    <div
+      className={`lobby-shell ${configOpen ? "is-config-open" : "is-config-closed"}`}
+    >
       <aside className="lobby-sidebar config-pane">
         <div className="sidebar-header">
           {configOpen ? (
@@ -1047,7 +1217,7 @@ function LobbyPage() {
           )}
         </div>
 
-        <div className={`config-scroller ${!configOpen ? 'hidden' : ''}`}>
+        <div className={`config-scroller ${!configOpen ? "hidden" : ""}`}>
           <div className="config-group">
             <h4 className="group-title">Règles</h4>
             <div className="fields-grid">
@@ -1080,26 +1250,36 @@ function LobbyPage() {
               />
             </div>
 
-            <label className={`toggle-row ${!isOwner ? 'toggle-row--disabled' : ''}`}>
+            <label
+              className={`toggle-row ${!isOwner ? "toggle-row--disabled" : ""}`}
+            >
               <input
                 type="checkbox"
                 checked={showAnswers}
                 disabled={!isOwner}
                 onChange={(e) => {
                   setShowAnswers(e.target.checked);
-                  sendWsMessage('update_config', { show_answers: e.target.checked });
+                  sendWsMessage("update_config", {
+                    show_answers: e.target.checked,
+                  });
                 }}
               />
-              <span className="toggle-label">Montrer les mauvaises réponses</span>
+              <span className="toggle-label">
+                Montrer les mauvaises réponses
+              </span>
             </label>
 
-            {isOwner && gameState === 'PLAYING' && (
+            {isOwner && gameState === "PLAYING" && (
               <button
                 type="button"
                 className="btn-end-game"
                 onClick={() => {
-                  if (window.confirm('Terminer la partie ? Tous les joueurs seront renvoyés au lobby.')) {
-                    sendWsMessage('end_game');
+                  if (
+                    window.confirm(
+                      "Terminer la partie ? Tous les joueurs seront renvoyés au lobby.",
+                    )
+                  ) {
+                    sendWsMessage("end_game");
                   }
                 }}
               >
@@ -1108,7 +1288,7 @@ function LobbyPage() {
             )}
           </div>
 
-          {gameState === 'WAITING' && (
+          {gameState === "WAITING" && (
             <div className="config-group">
               <div className="group-header">
                 <h4 className="group-title">Catégories</h4>
@@ -1117,7 +1297,10 @@ function LobbyPage() {
 
               <div className="category-list">
                 {categories.map((cat) => (
-                  <div key={cat.id} className={`category-item ${!isOwner ? 'category-item--disabled' : ''}`}>
+                  <div
+                    key={cat.id}
+                    className={`category-item ${!isOwner ? "category-item--disabled" : ""}`}
+                  >
                     <span className="cat-name">{cat.name}</span>
                     {isOwner && (
                       <div className="cat-actions">
@@ -1126,15 +1309,21 @@ function LobbyPage() {
                           className={`btn-mode ${cat.mode}`}
                           onClick={() => toggleMode(cat.id)}
                         >
-                          {cat.mode === 'uniquement' ? 'UNIQUEMENT' : 'EXCLURE'}
+                          {cat.mode === "uniquement" ? "UNIQUEMENT" : "EXCLURE"}
                         </button>
-                        <button type="button" className="btn-remove" onClick={() => removeCategory(cat.id)}>
+                        <button
+                          type="button"
+                          className="btn-remove"
+                          onClick={() => removeCategory(cat.id)}
+                        >
                           X
                         </button>
                       </div>
                     )}
                     {!isOwner && (
-                      <span className="cat-mode-label">{cat.mode === 'uniquement' ? 'UNIQUEMENT' : 'EXCLURE'}</span>
+                      <span className="cat-mode-label">
+                        {cat.mode === "uniquement" ? "UNIQUEMENT" : "EXCLURE"}
+                      </span>
                     )}
                   </div>
                 ))}
@@ -1149,9 +1338,11 @@ function LobbyPage() {
                     placeholder="Nouvelle catégorie..."
                     onFocus={openDropdown}
                     onClick={openDropdown}
-                    onKeyDown={(e) => e.key === 'Enter' && addCategory()}
+                    onKeyDown={(e) => e.key === "Enter" && addCategory()}
                   />
-                  <button type="button" onClick={addCategory}>+</button>
+                  <button type="button" onClick={addCategory}>
+                    +
+                  </button>
                   {dropdownOpen ? (
                     <div className="category-suggestions">
                       {availableCategories.length > 0 ? (
@@ -1167,7 +1358,9 @@ function LobbyPage() {
                           </button>
                         ))
                       ) : (
-                        <div className="category-suggestions__empty">Aucune catégorie disponible</div>
+                        <div className="category-suggestions__empty">
+                          Aucune catégorie disponible
+                        </div>
                       )}
                     </div>
                   ) : null}
@@ -1179,9 +1372,9 @@ function LobbyPage() {
       </aside>
 
       <main className="lobby-stage">
-        {gameState === 'FINISHED' ? (
+        {gameState === "FINISHED" ? (
           <div className="stage-content">{renderFinishedScreen()}</div>
-        ) : gameState === 'PLAYING' ? (
+        ) : gameState === "PLAYING" ? (
           <div className="stage-content">{renderPlayingScreen()}</div>
         ) : (
           renderWaitingScreen()
@@ -1196,18 +1389,21 @@ function LobbyPage() {
             <h4>CHAT</h4>
           </div>
           <div className="chat-messages">
-            {chatMessages.map((msg, i) => (
+            {chatMessages.map((msg, i) =>
               msg.system ? (
                 <div key={i} className="chat-msg chat-msg--system">
                   <span className="chat-msg__text">{msg.text}</span>
                 </div>
               ) : (
-                <div key={i} className={`chat-msg ${msg.player_uuid === playerUuid ? 'chat-msg--me' : ''}`}>
+                <div
+                  key={i}
+                  className={`chat-msg ${msg.player_uuid === playerUuid ? "chat-msg--me" : ""}`}
+                >
                   <span className="chat-msg__pseudo">{msg.pseudo}</span>
                   <span className="chat-msg__text">{msg.text}</span>
                 </div>
-              )
-            ))}
+              ),
+            )}
             <div ref={chatEndRef} />
           </div>
           <div className="chat-input-area">
@@ -1217,11 +1413,15 @@ function LobbyPage() {
               className="chat-input"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
+              onKeyDown={(e) => e.key === "Enter" && handleSendChat()}
               placeholder="Message..."
               maxLength={300}
             />
-            <button type="button" className="chat-send-btn" onClick={handleSendChat}>
+            <button
+              type="button"
+              className="chat-send-btn"
+              onClick={handleSendChat}
+            >
               &rarr;
             </button>
           </div>

@@ -8,7 +8,13 @@ from pydantic import BaseModel, Field
 
 from app.core.security import get_current_user
 from app.db.client import ensure_db
-from app.models.room import GameState, PlayerInfo, RoomConfigurations, RoomDocument, RoomPrivacy
+from app.models.room import (
+    GameState,
+    PlayerInfo,
+    RoomConfigurations,
+    RoomDocument,
+    RoomPrivacy,
+)
 from app.models.user import UserDocument
 
 
@@ -61,7 +67,11 @@ async def list_public_rooms() -> List[PublicRoom]:
     for room in rooms:
         connected = room.connected_players_count()
         if connected == 0:
-            expires_at = room.expires_at.replace(tzinfo=None) if room.expires_at.tzinfo is not None else room.expires_at
+            expires_at = (
+                room.expires_at.replace(tzinfo=None)
+                if room.expires_at.tzinfo is not None
+                else room.expires_at
+            )
             if expires_at <= now:
                 await room.delete()
             continue
@@ -88,7 +98,9 @@ async def list_public_rooms() -> List[PublicRoom]:
 
 
 @router.post("", response_model=CreateRoomResponse, status_code=status.HTTP_201_CREATED)
-async def create_room(payload: CreateRoomRequest, current_user: UserDocument = Depends(get_current_user)) -> CreateRoomResponse:
+async def create_room(
+    payload: CreateRoomRequest, current_user: UserDocument = Depends(get_current_user)
+) -> CreateRoomResponse:
     await ensure_db()
 
     for _ in range(50):
@@ -97,7 +109,10 @@ async def create_room(payload: CreateRoomRequest, current_user: UserDocument = D
         if not existing:
             break
     else:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Impossible de générer un code de room.")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Impossible de générer un code de room.",
+        )
 
     now_ms = _now_ms()
     room = RoomDocument(

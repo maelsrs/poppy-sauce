@@ -1,5 +1,10 @@
 :root {
-  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family:
+    "Inter",
+    "Segoe UI",
+    system-ui,
+    -apple-system,
+    sans-serif;
   --lobby-bg: #0b0e14;
   --lobby-panel: #11141b;
   --lobby-border: #272a32;
@@ -210,7 +215,9 @@
   padding: 12px;
   font-size: 0.95rem;
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .field__input:focus {
@@ -264,7 +271,10 @@
   color: #e2e8f0;
   font-weight: 800;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.1s ease;
 }
 
 .account-tab.is-active {
@@ -353,7 +363,9 @@
   padding: 6px 10px;
   cursor: pointer;
   font-size: 1rem;
-  transition: background 0.2s ease, transform 0.1s ease;
+  transition:
+    background 0.2s ease,
+    transform 0.1s ease;
 }
 
 .modal__close:hover {
@@ -433,7 +445,10 @@
   color: #f8fafc;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s ease, transform 0.1s ease, border-color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    transform 0.1s ease,
+    border-color 0.2s ease;
 }
 
 .account-card__btn--primary {
@@ -507,7 +522,9 @@
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.08);
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .action-card:hover {
@@ -1106,7 +1123,9 @@
   color: #f8fafc;
   font-weight: 800;
   cursor: pointer;
-  transition: transform 0.1s ease, background 0.2s ease;
+  transition:
+    transform 0.1s ease,
+    background 0.2s ease;
 }
 
 .public__create:hover {
@@ -1158,7 +1177,9 @@
 }
 
 .game-card__code {
-  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-family:
+    "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, "Liberation Mono", "Courier New", monospace;
   letter-spacing: 0.08em;
   font-weight: 700;
   color: #bfdbfe;
@@ -1194,7 +1215,6 @@
     margin-top: -70px;
   }
 }
-
 
 .game-screen {
   display: flex;
@@ -1335,7 +1355,9 @@
   letter-spacing: 0.05em;
   cursor: pointer;
   text-transform: uppercase;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 
 .game-skip-btn:hover {
@@ -1401,7 +1423,6 @@
   letter-spacing: 0.05em;
 }
 
-
 .round-won-banner {
   text-align: center;
   padding: 12px;
@@ -1425,7 +1446,7 @@
 }
 
 .player-row--skipped .player-name::after {
-  content: ' (skip)';
+  content: " (skip)";
   font-size: 0.7rem;
   color: #94a3b8;
   font-weight: 600;
@@ -1449,7 +1470,6 @@
   padding: 1px 4px;
   margin-left: 4px;
 }
-
 
 .finished-screen {
   display: flex;
@@ -1658,7 +1678,6 @@
   background: rgba(239, 68, 68, 0.2);
 }
 
-
 .player-profile-popup {
   position: absolute;
   top: 0;
@@ -1755,7 +1774,6 @@
 .player-row--selected {
   background: rgba(37, 99, 235, 0.12) !important;
 }
-
 
 .pseudo-popup {
   background: var(--lobby-panel);
@@ -1899,7 +1917,6 @@
   background: #1d4ed8;
 }
 
-
 .admin-nav {
   background: #0f172a;
   border: 1px solid #1e293b;
@@ -1942,7 +1959,10 @@
   color: #e2e8f0;
   font-weight: 800;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.1s ease;
 }
 
 .admin-tab.is-active {
@@ -1991,7 +2011,9 @@
   font-size: 0.88rem;
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2209,7 +2231,9 @@
   font-weight: 700;
   font-size: 0.82rem;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .admin-page-btn:hover:not(:disabled) {

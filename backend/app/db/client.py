@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 client: Optional[AsyncIOMotorClient] = None
 DOCUMENT_MODELS = [QuestionDocument, UserDocument, RoomDocument]
 
+
 async def init_db() -> None:
     global client
     if client:
@@ -24,6 +25,7 @@ async def init_db() -> None:
             client.close()
             client = None
         raise
+
 
 async def close_db() -> None:
     global client

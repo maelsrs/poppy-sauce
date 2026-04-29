@@ -755,7 +755,9 @@ function AdminPage() {
             <div className="question-view__category">
               {viewingQuestion.category}
             </div>
-            <p className="question-view__question">{viewingQuestion.question}</p>
+            <p className="question-view__question">
+              {viewingQuestion.question}
+            </p>
             {viewingQuestion.image_url && (
               <img
                 src={viewingQuestion.image_url}

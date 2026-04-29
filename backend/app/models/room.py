@@ -81,7 +81,9 @@ class GameData(BaseModel):
 
 class RoomDocument(Document):
     room_uuid: Indexed(str, unique=True) = Field(default_factory=lambda: str(uuid4()))
-    room_code: Indexed(str, unique=True) = Field(..., min_length=4, max_length=4, regex=r"^[A-Z]{4}$")
+    room_code: Indexed(str, unique=True) = Field(
+        ..., min_length=4, max_length=4, regex=r"^[A-Z]{4}$"
+    )
     room_name: str = Field(default="Salon", min_length=1, max_length=64)
 
     privacy: Indexed(str) = Field(default=RoomPrivacy.OPEN)

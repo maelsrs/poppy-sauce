@@ -11,9 +11,14 @@ from app.models.user import UserDocument, UserPublic, UserRank
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
-async def require_admin(current_user: UserDocument = Depends(get_current_user)) -> UserDocument:
+async def require_admin(
+    current_user: UserDocument = Depends(get_current_user),
+) -> UserDocument:
     if current_user.rank != UserRank.ADMIN:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès réservé aux administrateurs.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès réservé aux administrateurs.",
+        )
     return current_user
 
 
@@ -129,12 +134,7 @@ async def admin_list_users(
         total = await UserDocument.get_pymongo_collection().estimated_document_count()
     pages = max(1, ceil(total / per_page))
     skip = (page - 1) * per_page
-    users = (
-        await UserDocument.find(query_filter)
-        .skip(skip)
-        .limit(per_page)
-        .to_list()
-    )
+    users = await UserDocument.find(query_filter).skip(skip).limit(per_page).to_list()
     return PaginatedUsers(
         items=[u.to_public() for u in users],
         total=total,
@@ -154,9 +154,7 @@ async def admin_question_stats(
     ]
     cursor = QuestionDocument.get_pymongo_collection().aggregate(pipeline)
     rows = await cursor.to_list(length=None)
-    categories = [
-        CategoryStat(name=row["_id"], count=row["count"]) for row in rows
-    ]
+    categories = [CategoryStat(name=row["_id"], count=row["count"]) for row in rows]
     total = sum(c.count for c in categories)
     return QuestionStats(total=total, categories=categories)
 
@@ -173,14 +171,13 @@ async def admin_list_questions(
         total = await QuestionDocument.find(query_filter).count()
     else:
         query_filter = {}
-        total = await QuestionDocument.get_pymongo_collection().estimated_document_count()
+        total = (
+            await QuestionDocument.get_pymongo_collection().estimated_document_count()
+        )
     pages = max(1, ceil(total / per_page))
     skip = (page - 1) * per_page
     questions = (
-        await QuestionDocument.find(query_filter)
-        .skip(skip)
-        .limit(per_page)
-        .to_list()
+        await QuestionDocument.find(query_filter).skip(skip).limit(per_page).to_list()
     )
     return PaginatedQuestions(
         items=[_question_to_out(q) for q in questions],
@@ -189,7 +186,6 @@ async def admin_list_questions(
         per_page=per_page,
         pages=pages,
     )
-
 
 
 @router.put("/users/{uuid}", response_model=UserPublic)
@@ -203,7 +199,9 @@ async def admin_update_user(
         raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
 
     if payload.username is not None:
-        existing = await UserDocument.find_one(UserDocument.username == payload.username)
+        existing = await UserDocument.find_one(
+            UserDocument.username == payload.username
+        )
         if existing and existing.uuid != uuid:
             raise HTTPException(status_code=409, detail="Ce pseudo est déjà pris.")
         user.username = payload.username
@@ -227,15 +225,18 @@ async def admin_delete_user(
     admin: UserDocument = Depends(require_admin),
 ):
     if admin.uuid == uuid:
-        raise HTTPException(status_code=400, detail="Impossible de supprimer votre propre compte.")
+        raise HTTPException(
+            status_code=400, detail="Impossible de supprimer votre propre compte."
+        )
     user = await UserDocument.find_one(UserDocument.uuid == uuid)
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
     await user.delete()
 
 
-
-@router.post("/questions", response_model=QuestionOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/questions", response_model=QuestionOut, status_code=status.HTTP_201_CREATED
+)
 async def admin_create_question(
     payload: CreateQuestionRequest,
     _admin: UserDocument = Depends(require_admin),

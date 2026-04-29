@@ -21,6 +21,7 @@ fastapi_app = FastAPI(title="poppy-sauce")
 
 logger = logging.getLogger("uvicorn.access")
 
+
 @fastapi_app.on_event("startup")
 async def startup_event():
     await init_db()
@@ -29,6 +30,7 @@ async def startup_event():
 @fastapi_app.on_event("shutdown")
 async def shutdown_event():
     await close_db()
+
 
 @fastapi_app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -55,7 +57,11 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             if field and "password" in field:
                 msg = f"Le mot de passe doit contenir au moins {limit or 8} caractères."
             else:
-                msg = f"Champ trop court (min {limit} caractères)." if limit else "Champ trop court."
+                msg = (
+                    f"Champ trop court (min {limit} caractères)."
+                    if limit
+                    else "Champ trop court."
+                )
 
         if field:
             message = f"{field} : {msg}"
@@ -63,6 +69,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             message = msg
 
     return JSONResponse(status_code=422, content={"detail": message})
+
 
 fastapi_app.add_middleware(
     CORSMiddleware,
