@@ -4,7 +4,7 @@
 
 ## Lien : https://poppy.lsblk2exa.beauty
 
-**Site de quiz fortement inspiré de [Pop Sauce](https://jklm.fun/).**, qui propose des parties de culture générale avec des rounds chronométrés, des questions imagées, et des catégories variées.
+**Site de quiz fortement inspiré de [Pop Sauce](https://jklm.fun/)**, qui propose des parties de culture générale avec des rounds chronométrés, des questions imagées, et des catégories variées.
 
 ## Fonctionnalités
 
