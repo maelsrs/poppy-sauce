@@ -6,7 +6,6 @@ services:
     restart: always
     environment:
       MONGO_INITDB_DATABASE: poppy_sauce
-      # C'est ici qu'on sécurise ! Change ces valeurs.
     ports:
       - "27017:27017"
     volumes:
