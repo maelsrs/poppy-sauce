@@ -100,5 +100,5 @@ Détails des champs :
 - **Frontend** : [React 19](https://react.dev/) / [TypeScript](https://www.typescriptlang.org/) / [Vite](https://vite.dev/) / [Socket.IO client](https://socket.io/)
 - **Backend** : [FastAPI](https://fastapi.tiangolo.com/) / [Beanie](https://beanie-odm.dev/) / [Motor](https://motor.readthedocs.io/) / [python-socketio](https://python-socketio.readthedocs.io/)
 - **DB** : [MongoDB](https://www.mongodb.com/)
-- **Deploy** : [Docker](https://www.docker.com/) / [Caddy](https://caddyserver.com/) / [Nginx](https://nginx.org/) (front)
+- **Deploy** : [Docker](https://www.docker.com/) / [[Nginx](https://nginx.org/)
 - **CI/CD** : [GitHub Actions](https://github.com/features/actions) → [GHCR](https://ghcr.io)
